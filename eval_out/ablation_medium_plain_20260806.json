@@ -1,0 +1,1105 @@
+{
+  "generated_at": "2026-08-07T07:33:04+0800",
+  "repo": "/Users/hu/WorkBuddy/2026-08-06-16-02-06/aml-retriever",
+  "top_k": 100,
+  "wall_clock_s": 89.46,
+  "environment": {
+    "python": "3.13.12",
+    "implementation": "CPython",
+    "platform": "macOS-26.5-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "sqlite_library_version": "3.50.4",
+    "fts5": true,
+    "vector_backend_available": false,
+    "vector_backend_reason": "no local vector dependency (numpy/sentence_transformers/faiss) importable",
+    "third_party_packages_installed": false,
+    "network_access_used": false
+  },
+  "dataset": {
+    "seed": 20260806,
+    "scale": "medium",
+    "difficulty": "plain",
+    "users": 48,
+    "sessions": 144,
+    "messages": 5184,
+    "queries": 240,
+    "scored_queries": 192,
+    "queries_by_kind": {
+      "absent": 48,
+      "knowledge_update": 48,
+      "multi_session": 48,
+      "single_hop": 48,
+      "temporal": 48
+    },
+    "queries_by_difficulty": {
+      "plain": 240
+    }
+  },
+  "stages": [
+    {
+      "stage": "L0_lexical_baseline",
+      "flags": {
+        "views": false,
+        "exact": false,
+        "datenum": false,
+        "entity": false,
+        "rerank": false,
+        "temporal_intent": false,
+        "rrf": false,
+        "dedup": false,
+        "use_options": true,
+        "exact_scan": false,
+        "vector": false,
+        "supersession": false
+      },
+      "skipped": false,
+      "skip_reason": "",
+      "index": {
+        "add_calls": 288,
+        "messages": 5184,
+        "elapsed_s": 1.892,
+        "messages_per_s": 2740.1,
+        "rows": {
+          "messages": 5184,
+          "views": 0,
+          "users": 48,
+          "sessions": 144
+        }
+      },
+      "overall": {
+        "queries": 192,
+        "recall@20": 1.0,
+        "recall@100": 1.0,
+        "mrr": 0.7193,
+        "distractor_leak@10": 1.0,
+        "avg_returned": 31.8
+      },
+      "by_kind": {
+        "absent": {
+          "queries": 48,
+          "note": "gold 为空，不计入 Recall/MRR",
+          "avg_returned": 49.92
+        },
+        "knowledge_update": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 14.02
+        },
+        "multi_session": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": null,
+          "avg_returned": 18.0
+        },
+        "single_hop": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.3771,
+          "distractor_leak@10": null,
+          "avg_returned": 50.9
+        },
+        "temporal": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.5,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 44.27
+        }
+      },
+      "by_difficulty": {
+        "plain": {
+          "queries": 192,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.7193,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 31.8
+        }
+      },
+      "by_kind_difficulty": {
+        "knowledge_update|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 14.02
+        },
+        "multi_session|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": null,
+          "avg_returned": 18.0
+        },
+        "single_hop|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.3771,
+          "distractor_leak@10": null,
+          "avg_returned": 50.9
+        },
+        "temporal|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.5,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 44.27
+        }
+      },
+      "latency": {
+        "count": 240,
+        "mean_ms": 2.968,
+        "p50_ms": 2.71,
+        "p95_ms": 5.242,
+        "p99_ms": 6.17,
+        "max_ms": 7.115
+      }
+    },
+    {
+      "stage": "L1_plus_views",
+      "flags": {
+        "views": true,
+        "exact": false,
+        "datenum": false,
+        "entity": false,
+        "rerank": false,
+        "temporal_intent": false,
+        "rrf": false,
+        "dedup": false,
+        "use_options": true,
+        "exact_scan": false,
+        "vector": false,
+        "supersession": false
+      },
+      "skipped": false,
+      "skip_reason": "",
+      "index": {
+        "add_calls": 288,
+        "messages": 5184,
+        "elapsed_s": 10.248,
+        "messages_per_s": 505.8,
+        "rows": {
+          "messages": 5184,
+          "views": 3024,
+          "users": 48,
+          "sessions": 144
+        }
+      },
+      "overall": {
+        "queries": 192,
+        "recall@20": 1.0,
+        "recall@100": 1.0,
+        "mrr": 0.7193,
+        "distractor_leak@10": 1.0,
+        "avg_returned": 72.19
+      },
+      "by_kind": {
+        "absent": {
+          "queries": 48,
+          "note": "gold 为空，不计入 Recall/MRR",
+          "avg_returned": 100.0
+        },
+        "knowledge_update": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 40.48
+        },
+        "multi_session": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": null,
+          "avg_returned": 48.29
+        },
+        "single_hop": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.3771,
+          "distractor_leak@10": null,
+          "avg_returned": 100.0
+        },
+        "temporal": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.5,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 100.0
+        }
+      },
+      "by_difficulty": {
+        "plain": {
+          "queries": 192,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.7193,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 72.19
+        }
+      },
+      "by_kind_difficulty": {
+        "knowledge_update|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 40.48
+        },
+        "multi_session|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": null,
+          "avg_returned": 48.29
+        },
+        "single_hop|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.3771,
+          "distractor_leak@10": null,
+          "avg_returned": 100.0
+        },
+        "temporal|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.5,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 100.0
+        }
+      },
+      "latency": {
+        "count": 240,
+        "mean_ms": 9.062,
+        "p50_ms": 8.534,
+        "p95_ms": 15.862,
+        "p99_ms": 16.999,
+        "max_ms": 21.727
+      }
+    },
+    {
+      "stage": "L2_plus_exact",
+      "flags": {
+        "views": true,
+        "exact": true,
+        "datenum": false,
+        "entity": false,
+        "rerank": false,
+        "temporal_intent": false,
+        "rrf": false,
+        "dedup": false,
+        "use_options": true,
+        "exact_scan": false,
+        "vector": false,
+        "supersession": false
+      },
+      "skipped": false,
+      "skip_reason": "",
+      "index": {
+        "add_calls": 288,
+        "messages": 5184,
+        "elapsed_s": 10.243,
+        "messages_per_s": 506.1,
+        "rows": {
+          "messages": 5184,
+          "views": 3024,
+          "users": 48,
+          "sessions": 144
+        }
+      },
+      "overall": {
+        "queries": 192,
+        "recall@20": 1.0,
+        "recall@100": 1.0,
+        "mrr": 0.7193,
+        "distractor_leak@10": 1.0,
+        "avg_returned": 72.19
+      },
+      "by_kind": {
+        "absent": {
+          "queries": 48,
+          "note": "gold 为空，不计入 Recall/MRR",
+          "avg_returned": 100.0
+        },
+        "knowledge_update": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 40.48
+        },
+        "multi_session": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": null,
+          "avg_returned": 48.29
+        },
+        "single_hop": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.3771,
+          "distractor_leak@10": null,
+          "avg_returned": 100.0
+        },
+        "temporal": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.5,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 100.0
+        }
+      },
+      "by_difficulty": {
+        "plain": {
+          "queries": 192,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.7193,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 72.19
+        }
+      },
+      "by_kind_difficulty": {
+        "knowledge_update|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 40.48
+        },
+        "multi_session|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": null,
+          "avg_returned": 48.29
+        },
+        "single_hop|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.3771,
+          "distractor_leak@10": null,
+          "avg_returned": 100.0
+        },
+        "temporal|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.5,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 100.0
+        }
+      },
+      "latency": {
+        "count": 240,
+        "mean_ms": 9.138,
+        "p50_ms": 8.405,
+        "p95_ms": 15.697,
+        "p99_ms": 22.386,
+        "max_ms": 34.624
+      }
+    },
+    {
+      "stage": "L3_plus_context",
+      "flags": {
+        "views": true,
+        "exact": true,
+        "datenum": true,
+        "entity": true,
+        "rerank": true,
+        "temporal_intent": false,
+        "rrf": false,
+        "dedup": false,
+        "use_options": true,
+        "exact_scan": false,
+        "vector": false,
+        "supersession": false
+      },
+      "skipped": false,
+      "skip_reason": "",
+      "index": {
+        "add_calls": 288,
+        "messages": 5184,
+        "elapsed_s": 10.123,
+        "messages_per_s": 512.1,
+        "rows": {
+          "messages": 5184,
+          "views": 3024,
+          "users": 48,
+          "sessions": 144
+        }
+      },
+      "overall": {
+        "queries": 192,
+        "recall@20": 1.0,
+        "recall@100": 1.0,
+        "mrr": 0.7547,
+        "distractor_leak@10": 0.7292,
+        "avg_returned": 72.19
+      },
+      "by_kind": {
+        "absent": {
+          "queries": 48,
+          "note": "gold 为空，不计入 Recall/MRR",
+          "avg_returned": 100.0
+        },
+        "knowledge_update": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.9208,
+          "distractor_leak@10": 0.4583,
+          "avg_returned": 40.48
+        },
+        "multi_session": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": null,
+          "avg_returned": 48.29
+        },
+        "single_hop": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.0981,
+          "distractor_leak@10": null,
+          "avg_returned": 100.0
+        },
+        "temporal": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 100.0
+        }
+      },
+      "by_difficulty": {
+        "plain": {
+          "queries": 192,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.7547,
+          "distractor_leak@10": 0.7292,
+          "avg_returned": 72.19
+        }
+      },
+      "by_kind_difficulty": {
+        "knowledge_update|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.9208,
+          "distractor_leak@10": 0.4583,
+          "avg_returned": 40.48
+        },
+        "multi_session|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": null,
+          "avg_returned": 48.29
+        },
+        "single_hop|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.0981,
+          "distractor_leak@10": null,
+          "avg_returned": 100.0
+        },
+        "temporal|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 100.0
+        }
+      },
+      "latency": {
+        "count": 240,
+        "mean_ms": 9.951,
+        "p50_ms": 9.12,
+        "p95_ms": 16.78,
+        "p99_ms": 26.871,
+        "max_ms": 34.518
+      }
+    },
+    {
+      "stage": "L4_plus_dedup",
+      "flags": {
+        "views": true,
+        "exact": true,
+        "datenum": true,
+        "entity": true,
+        "rerank": true,
+        "temporal_intent": false,
+        "rrf": false,
+        "dedup": true,
+        "use_options": true,
+        "exact_scan": false,
+        "vector": false,
+        "supersession": false
+      },
+      "skipped": false,
+      "skip_reason": "",
+      "index": {
+        "add_calls": 288,
+        "messages": 5184,
+        "elapsed_s": 10.121,
+        "messages_per_s": 512.2,
+        "rows": {
+          "messages": 5184,
+          "views": 3024,
+          "users": 48,
+          "sessions": 144
+        }
+      },
+      "overall": {
+        "queries": 192,
+        "recall@20": 1.0,
+        "recall@100": 1.0,
+        "mrr": 0.7553,
+        "distractor_leak@10": 0.7708,
+        "avg_returned": 59.06
+      },
+      "by_kind": {
+        "absent": {
+          "queries": 48,
+          "note": "gold 为空，不计入 Recall/MRR",
+          "avg_returned": 100.0
+        },
+        "knowledge_update": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.9208,
+          "distractor_leak@10": 0.5417,
+          "avg_returned": 31.88
+        },
+        "multi_session": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": null,
+          "avg_returned": 31.4
+        },
+        "single_hop": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.1004,
+          "distractor_leak@10": null,
+          "avg_returned": 76.33
+        },
+        "temporal": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 96.65
+        }
+      },
+      "by_difficulty": {
+        "plain": {
+          "queries": 192,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.7553,
+          "distractor_leak@10": 0.7708,
+          "avg_returned": 59.06
+        }
+      },
+      "by_kind_difficulty": {
+        "knowledge_update|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.9208,
+          "distractor_leak@10": 0.5417,
+          "avg_returned": 31.88
+        },
+        "multi_session|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": null,
+          "avg_returned": 31.4
+        },
+        "single_hop|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.1004,
+          "distractor_leak@10": null,
+          "avg_returned": 76.33
+        },
+        "temporal|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 96.65
+        }
+      },
+      "latency": {
+        "count": 240,
+        "mean_ms": 9.164,
+        "p50_ms": 8.532,
+        "p95_ms": 15.327,
+        "p99_ms": 16.573,
+        "max_ms": 38.401
+      }
+    },
+    {
+      "stage": "L5_plus_weighted_rrf",
+      "flags": {
+        "views": true,
+        "exact": true,
+        "datenum": true,
+        "entity": true,
+        "rerank": true,
+        "temporal_intent": false,
+        "rrf": true,
+        "dedup": true,
+        "use_options": true,
+        "exact_scan": false,
+        "vector": false,
+        "supersession": false
+      },
+      "skipped": false,
+      "skip_reason": "",
+      "index": {
+        "add_calls": 288,
+        "messages": 5184,
+        "elapsed_s": 9.847,
+        "messages_per_s": 526.5,
+        "rows": {
+          "messages": 5184,
+          "views": 3024,
+          "users": 48,
+          "sessions": 144
+        }
+      },
+      "overall": {
+        "queries": 192,
+        "recall@20": 1.0,
+        "recall@100": 1.0,
+        "mrr": 0.7613,
+        "distractor_leak@10": 0.7917,
+        "avg_returned": 59.17
+      },
+      "by_kind": {
+        "absent": {
+          "queries": 48,
+          "note": "gold 为空，不计入 Recall/MRR",
+          "avg_returned": 100.0
+        },
+        "knowledge_update": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.9128,
+          "distractor_leak@10": 0.5833,
+          "avg_returned": 32.06
+        },
+        "multi_session": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": null,
+          "avg_returned": 31.5
+        },
+        "single_hop": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.1325,
+          "distractor_leak@10": null,
+          "avg_returned": 76.46
+        },
+        "temporal": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 96.65
+        }
+      },
+      "by_difficulty": {
+        "plain": {
+          "queries": 192,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.7613,
+          "distractor_leak@10": 0.7917,
+          "avg_returned": 59.17
+        }
+      },
+      "by_kind_difficulty": {
+        "knowledge_update|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.9128,
+          "distractor_leak@10": 0.5833,
+          "avg_returned": 32.06
+        },
+        "multi_session|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": null,
+          "avg_returned": 31.5
+        },
+        "single_hop|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.1325,
+          "distractor_leak@10": null,
+          "avg_returned": 76.46
+        },
+        "temporal|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 96.65
+        }
+      },
+      "latency": {
+        "count": 240,
+        "mean_ms": 10.062,
+        "p50_ms": 8.861,
+        "p95_ms": 16.574,
+        "p99_ms": 23.116,
+        "max_ms": 54.921
+      }
+    },
+    {
+      "stage": "L6_temporal_intent_ctrl",
+      "flags": {
+        "views": true,
+        "exact": true,
+        "datenum": true,
+        "entity": true,
+        "rerank": true,
+        "temporal_intent": true,
+        "rrf": true,
+        "dedup": true,
+        "use_options": true,
+        "exact_scan": false,
+        "vector": false,
+        "supersession": false
+      },
+      "skipped": false,
+      "skip_reason": "",
+      "index": {
+        "add_calls": 288,
+        "messages": 5184,
+        "elapsed_s": 10.144,
+        "messages_per_s": 511.1,
+        "rows": {
+          "messages": 5184,
+          "views": 3024,
+          "users": 48,
+          "sessions": 144
+        }
+      },
+      "overall": {
+        "queries": 192,
+        "recall@20": 1.0,
+        "recall@100": 1.0,
+        "mrr": 0.7623,
+        "distractor_leak@10": 0.6354,
+        "avg_returned": 59.17
+      },
+      "by_kind": {
+        "absent": {
+          "queries": 48,
+          "note": "gold 为空，不计入 Recall/MRR",
+          "avg_returned": 100.0
+        },
+        "knowledge_update": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.9167,
+          "distractor_leak@10": 0.2708,
+          "avg_returned": 32.06
+        },
+        "multi_session": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": null,
+          "avg_returned": 31.5
+        },
+        "single_hop": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.1325,
+          "distractor_leak@10": null,
+          "avg_returned": 76.46
+        },
+        "temporal": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 96.65
+        }
+      },
+      "by_difficulty": {
+        "plain": {
+          "queries": 192,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.7623,
+          "distractor_leak@10": 0.6354,
+          "avg_returned": 59.17
+        }
+      },
+      "by_kind_difficulty": {
+        "knowledge_update|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.9167,
+          "distractor_leak@10": 0.2708,
+          "avg_returned": 32.06
+        },
+        "multi_session|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": null,
+          "avg_returned": 31.5
+        },
+        "single_hop|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.1325,
+          "distractor_leak@10": null,
+          "avg_returned": 76.46
+        },
+        "temporal|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 96.65
+        }
+      },
+      "latency": {
+        "count": 240,
+        "mean_ms": 9.649,
+        "p50_ms": 8.93,
+        "p95_ms": 16.415,
+        "p99_ms": 18.557,
+        "max_ms": 43.798
+      }
+    },
+    {
+      "stage": "L7_plus_vector",
+      "flags": {
+        "views": true,
+        "exact": true,
+        "datenum": true,
+        "entity": true,
+        "rerank": true,
+        "temporal_intent": false,
+        "rrf": true,
+        "dedup": true,
+        "use_options": true,
+        "exact_scan": false,
+        "vector": true,
+        "supersession": false
+      },
+      "skipped": true,
+      "skip_reason": "vector backend unavailable: no local vector dependency (numpy/sentence_transformers/faiss) importable",
+      "index": {},
+      "overall": {},
+      "by_kind": {},
+      "by_difficulty": {},
+      "by_kind_difficulty": {},
+      "latency": {}
+    },
+    {
+      "stage": "L8_supersession_ctrl",
+      "flags": {
+        "views": true,
+        "exact": true,
+        "datenum": true,
+        "entity": true,
+        "rerank": true,
+        "temporal_intent": false,
+        "rrf": true,
+        "dedup": true,
+        "use_options": true,
+        "exact_scan": false,
+        "vector": false,
+        "supersession": true
+      },
+      "skipped": false,
+      "skip_reason": "",
+      "index": {
+        "add_calls": 288,
+        "messages": 5184,
+        "elapsed_s": 9.933,
+        "messages_per_s": 521.9,
+        "rows": {
+          "messages": 5184,
+          "views": 3024,
+          "users": 48,
+          "sessions": 144
+        }
+      },
+      "overall": {
+        "queries": 192,
+        "recall@20": 1.0,
+        "recall@100": 1.0,
+        "mrr": 0.7364,
+        "distractor_leak@10": 0.7708,
+        "avg_returned": 59.16
+      },
+      "by_kind": {
+        "absent": {
+          "queries": 48,
+          "note": "gold 为空，不计入 Recall/MRR",
+          "avg_returned": 100.0
+        },
+        "knowledge_update": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.8132,
+          "distractor_leak@10": 0.5417,
+          "avg_returned": 32.06
+        },
+        "multi_session": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": null,
+          "avg_returned": 31.48
+        },
+        "single_hop": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.1325,
+          "distractor_leak@10": null,
+          "avg_returned": 76.46
+        },
+        "temporal": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 96.65
+        }
+      },
+      "by_difficulty": {
+        "plain": {
+          "queries": 192,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.7364,
+          "distractor_leak@10": 0.7708,
+          "avg_returned": 59.16
+        }
+      },
+      "by_kind_difficulty": {
+        "knowledge_update|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.8132,
+          "distractor_leak@10": 0.5417,
+          "avg_returned": 32.06
+        },
+        "multi_session|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": null,
+          "avg_returned": 31.48
+        },
+        "single_hop|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.1325,
+          "distractor_leak@10": null,
+          "avg_returned": 76.46
+        },
+        "temporal|plain": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 1.0,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 96.65
+        }
+      },
+      "latency": {
+        "count": 240,
+        "mean_ms": 10.077,
+        "p50_ms": 9.563,
+        "p95_ms": 16.628,
+        "p99_ms": 21.418,
+        "max_ms": 30.334
+      }
+    }
+  ]
+}

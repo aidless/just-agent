@@ -1,0 +1,792 @@
+{
+  "generated_at": "2026-08-07T07:00:30+0800",
+  "repo": "/Users/hu/WorkBuddy/2026-08-06-16-02-06/aml-retriever",
+  "top_k": 100,
+  "wall_clock_s": 73.02,
+  "environment": {
+    "python": "3.13.12",
+    "implementation": "CPython",
+    "platform": "macOS-26.5-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "sqlite_library_version": "3.50.4",
+    "fts5": true,
+    "vector_backend_available": false,
+    "vector_backend_reason": "no local vector dependency (numpy/sentence_transformers/faiss) importable",
+    "third_party_packages_installed": false,
+    "network_access_used": false
+  },
+  "dataset": {
+    "seed": 20260806,
+    "scale": "medium",
+    "difficulty": "mixed",
+    "users": 48,
+    "sessions": 144,
+    "messages": 5184,
+    "queries": 240,
+    "scored_queries": 192,
+    "queries_by_kind": {
+      "absent": 48,
+      "knowledge_update": 48,
+      "multi_session": 48,
+      "single_hop": 48,
+      "temporal": 48
+    },
+    "queries_by_difficulty": {
+      "paraphrase": 120,
+      "plain": 120
+    }
+  },
+  "stages": [
+    {
+      "stage": "L0_lexical_baseline",
+      "flags": {
+        "views": false,
+        "exact": false,
+        "datenum": false,
+        "entity": false,
+        "rerank": false,
+        "temporal_intent": false,
+        "rrf": false,
+        "dedup": false,
+        "use_options": true,
+        "exact_scan": false,
+        "vector": false
+      },
+      "skipped": false,
+      "skip_reason": "",
+      "index": {
+        "add_calls": 288,
+        "messages": 5184,
+        "elapsed_s": 1.963,
+        "messages_per_s": 2640.4,
+        "rows": {
+          "messages": 5184,
+          "views": 0,
+          "users": 48,
+          "sessions": 144,
+          "db_path": "/Users/hu/WorkBuddy/2026-08-06-16-02-06/aml-retriever/eval_out/_work/L0_lexical_baseline.db"
+        }
+      },
+      "overall": {
+        "queries": 192,
+        "recall@20": 0.875,
+        "recall@100": 1.0,
+        "mrr": 0.5686,
+        "distractor_leak@10": 1.0,
+        "avg_returned": 34.83
+      },
+      "by_kind": {
+        "absent": {
+          "queries": 48,
+          "note": "gold 为空，不计入 Recall/MRR",
+          "avg_returned": 49.92
+        },
+        "knowledge_update": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.6184,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 12.48
+        },
+        "multi_session": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.6949,
+          "distractor_leak@10": null,
+          "avg_returned": 24.98
+        },
+        "single_hop": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.6997,
+          "distractor_leak@10": null,
+          "avg_returned": 47.67
+        },
+        "temporal": {
+          "queries": 48,
+          "recall@20": 0.5,
+          "recall@100": 1.0,
+          "mrr": 0.2616,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 54.19
+        }
+      },
+      "by_difficulty": {
+        "paraphrase": {
+          "queries": 96,
+          "recall@20": 0.75,
+          "recall@100": 1.0,
+          "mrr": 0.4124,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 37.58
+        },
+        "plain": {
+          "queries": 96,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.7248,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 32.07
+        }
+      },
+      "latency": {
+        "count": 240,
+        "mean_ms": 3.119,
+        "p50_ms": 3.146,
+        "p95_ms": 5.514,
+        "p99_ms": 7.015,
+        "max_ms": 19.349
+      }
+    },
+    {
+      "stage": "L1_plus_views",
+      "flags": {
+        "views": true,
+        "exact": false,
+        "datenum": false,
+        "entity": false,
+        "rerank": false,
+        "temporal_intent": false,
+        "rrf": false,
+        "dedup": false,
+        "use_options": true,
+        "exact_scan": false,
+        "vector": false
+      },
+      "skipped": false,
+      "skip_reason": "",
+      "index": {
+        "add_calls": 288,
+        "messages": 5184,
+        "elapsed_s": 9.555,
+        "messages_per_s": 542.5,
+        "rows": {
+          "messages": 5184,
+          "views": 3024,
+          "users": 48,
+          "sessions": 144,
+          "db_path": "/Users/hu/WorkBuddy/2026-08-06-16-02-06/aml-retriever/eval_out/_work/L1_plus_views.db"
+        }
+      },
+      "overall": {
+        "queries": 192,
+        "recall@20": 0.8724,
+        "recall@100": 1.0,
+        "mrr": 0.6006,
+        "distractor_leak@10": 1.0,
+        "avg_returned": 74.96
+      },
+      "by_kind": {
+        "absent": {
+          "queries": 48,
+          "note": "gold 为空，不计入 Recall/MRR",
+          "avg_returned": 100.0
+        },
+        "knowledge_update": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.6115,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 36.31
+        },
+        "multi_session": {
+          "queries": 48,
+          "recall@20": 0.9896,
+          "recall@100": 1.0,
+          "mrr": 0.8344,
+          "distractor_leak@10": null,
+          "avg_returned": 63.54
+        },
+        "single_hop": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.6997,
+          "distractor_leak@10": null,
+          "avg_returned": 100.0
+        },
+        "temporal": {
+          "queries": 48,
+          "recall@20": 0.5,
+          "recall@100": 1.0,
+          "mrr": 0.257,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 100.0
+        }
+      },
+      "by_difficulty": {
+        "paraphrase": {
+          "queries": 96,
+          "recall@20": 0.7448,
+          "recall@100": 1.0,
+          "mrr": 0.4764,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 77.39
+        },
+        "plain": {
+          "queries": 96,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.7248,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 72.54
+        }
+      },
+      "latency": {
+        "count": 240,
+        "mean_ms": 8.598,
+        "p50_ms": 9.165,
+        "p95_ms": 14.384,
+        "p99_ms": 16.059,
+        "max_ms": 21.884
+      }
+    },
+    {
+      "stage": "L2_plus_exact",
+      "flags": {
+        "views": true,
+        "exact": true,
+        "datenum": false,
+        "entity": false,
+        "rerank": false,
+        "temporal_intent": false,
+        "rrf": false,
+        "dedup": false,
+        "use_options": true,
+        "exact_scan": false,
+        "vector": false
+      },
+      "skipped": false,
+      "skip_reason": "",
+      "index": {
+        "add_calls": 288,
+        "messages": 5184,
+        "elapsed_s": 9.468,
+        "messages_per_s": 547.5,
+        "rows": {
+          "messages": 5184,
+          "views": 3024,
+          "users": 48,
+          "sessions": 144,
+          "db_path": "/Users/hu/WorkBuddy/2026-08-06-16-02-06/aml-retriever/eval_out/_work/L2_plus_exact.db"
+        }
+      },
+      "overall": {
+        "queries": 192,
+        "recall@20": 0.8724,
+        "recall@100": 1.0,
+        "mrr": 0.6006,
+        "distractor_leak@10": 1.0,
+        "avg_returned": 74.96
+      },
+      "by_kind": {
+        "absent": {
+          "queries": 48,
+          "note": "gold 为空，不计入 Recall/MRR",
+          "avg_returned": 100.0
+        },
+        "knowledge_update": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.6115,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 36.31
+        },
+        "multi_session": {
+          "queries": 48,
+          "recall@20": 0.9896,
+          "recall@100": 1.0,
+          "mrr": 0.8344,
+          "distractor_leak@10": null,
+          "avg_returned": 63.54
+        },
+        "single_hop": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.6997,
+          "distractor_leak@10": null,
+          "avg_returned": 100.0
+        },
+        "temporal": {
+          "queries": 48,
+          "recall@20": 0.5,
+          "recall@100": 1.0,
+          "mrr": 0.257,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 100.0
+        }
+      },
+      "by_difficulty": {
+        "paraphrase": {
+          "queries": 96,
+          "recall@20": 0.7448,
+          "recall@100": 1.0,
+          "mrr": 0.4764,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 77.39
+        },
+        "plain": {
+          "queries": 96,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.7248,
+          "distractor_leak@10": 1.0,
+          "avg_returned": 72.54
+        }
+      },
+      "latency": {
+        "count": 240,
+        "mean_ms": 7.892,
+        "p50_ms": 8.658,
+        "p95_ms": 13.488,
+        "p99_ms": 14.935,
+        "max_ms": 15.164
+      }
+    },
+    {
+      "stage": "L3_plus_context",
+      "flags": {
+        "views": true,
+        "exact": true,
+        "datenum": true,
+        "entity": true,
+        "rerank": true,
+        "temporal_intent": false,
+        "rrf": false,
+        "dedup": false,
+        "use_options": true,
+        "exact_scan": false,
+        "vector": false
+      },
+      "skipped": false,
+      "skip_reason": "",
+      "index": {
+        "add_calls": 288,
+        "messages": 5184,
+        "elapsed_s": 9.717,
+        "messages_per_s": 533.5,
+        "rows": {
+          "messages": 5184,
+          "views": 3024,
+          "users": 48,
+          "sessions": 144,
+          "db_path": "/Users/hu/WorkBuddy/2026-08-06-16-02-06/aml-retriever/eval_out/_work/L3_plus_context.db"
+        }
+      },
+      "overall": {
+        "queries": 192,
+        "recall@20": 0.9948,
+        "recall@100": 1.0,
+        "mrr": 0.6553,
+        "distractor_leak@10": 0.4375,
+        "avg_returned": 74.96
+      },
+      "by_kind": {
+        "absent": {
+          "queries": 48,
+          "note": "gold 为空，不计入 Recall/MRR",
+          "avg_returned": 100.0
+        },
+        "knowledge_update": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.9104,
+          "distractor_leak@10": 0.375,
+          "avg_returned": 36.31
+        },
+        "multi_session": {
+          "queries": 48,
+          "recall@20": 0.9792,
+          "recall@100": 1.0,
+          "mrr": 0.6192,
+          "distractor_leak@10": null,
+          "avg_returned": 63.54
+        },
+        "single_hop": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.5512,
+          "distractor_leak@10": null,
+          "avg_returned": 100.0
+        },
+        "temporal": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.5404,
+          "distractor_leak@10": 0.5,
+          "avg_returned": 100.0
+        }
+      },
+      "by_difficulty": {
+        "paraphrase": {
+          "queries": 96,
+          "recall@20": 0.9896,
+          "recall@100": 1.0,
+          "mrr": 0.5607,
+          "distractor_leak@10": 0.1042,
+          "avg_returned": 77.39
+        },
+        "plain": {
+          "queries": 96,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.7499,
+          "distractor_leak@10": 0.7708,
+          "avg_returned": 72.54
+        }
+      },
+      "latency": {
+        "count": 240,
+        "mean_ms": 8.355,
+        "p50_ms": 9.324,
+        "p95_ms": 14.195,
+        "p99_ms": 15.34,
+        "max_ms": 18.537
+      }
+    },
+    {
+      "stage": "L4_plus_dedup",
+      "flags": {
+        "views": true,
+        "exact": true,
+        "datenum": true,
+        "entity": true,
+        "rerank": true,
+        "temporal_intent": false,
+        "rrf": false,
+        "dedup": true,
+        "use_options": true,
+        "exact_scan": false,
+        "vector": false
+      },
+      "skipped": false,
+      "skip_reason": "",
+      "index": {
+        "add_calls": 288,
+        "messages": 5184,
+        "elapsed_s": 9.587,
+        "messages_per_s": 540.7,
+        "rows": {
+          "messages": 5184,
+          "views": 3024,
+          "users": 48,
+          "sessions": 144,
+          "db_path": "/Users/hu/WorkBuddy/2026-08-06-16-02-06/aml-retriever/eval_out/_work/L4_plus_dedup.db"
+        }
+      },
+      "overall": {
+        "queries": 192,
+        "recall@20": 1.0,
+        "recall@100": 1.0,
+        "mrr": 0.6576,
+        "distractor_leak@10": 0.5104,
+        "avg_returned": 63.11
+      },
+      "by_kind": {
+        "absent": {
+          "queries": 48,
+          "note": "gold 为空，不计入 Recall/MRR",
+          "avg_returned": 100.0
+        },
+        "knowledge_update": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.9139,
+          "distractor_leak@10": 0.5208,
+          "avg_returned": 28.9
+        },
+        "multi_session": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.6239,
+          "distractor_leak@10": null,
+          "avg_returned": 37.02
+        },
+        "single_hop": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.5522,
+          "distractor_leak@10": null,
+          "avg_returned": 88.15
+        },
+        "temporal": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.5404,
+          "distractor_leak@10": 0.5,
+          "avg_returned": 98.38
+        }
+      },
+      "by_difficulty": {
+        "paraphrase": {
+          "queries": 96,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.5648,
+          "distractor_leak@10": 0.1667,
+          "avg_returned": 66.22
+        },
+        "plain": {
+          "queries": 96,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.7504,
+          "distractor_leak@10": 0.8542,
+          "avg_returned": 60.0
+        }
+      },
+      "latency": {
+        "count": 240,
+        "mean_ms": 9.003,
+        "p50_ms": 9.887,
+        "p95_ms": 14.889,
+        "p99_ms": 20.783,
+        "max_ms": 28.855
+      }
+    },
+    {
+      "stage": "L5_plus_weighted_rrf",
+      "flags": {
+        "views": true,
+        "exact": true,
+        "datenum": true,
+        "entity": true,
+        "rerank": true,
+        "temporal_intent": false,
+        "rrf": true,
+        "dedup": true,
+        "use_options": true,
+        "exact_scan": false,
+        "vector": false
+      },
+      "skipped": false,
+      "skip_reason": "",
+      "index": {
+        "add_calls": 288,
+        "messages": 5184,
+        "elapsed_s": 10.173,
+        "messages_per_s": 509.6,
+        "rows": {
+          "messages": 5184,
+          "views": 3024,
+          "users": 48,
+          "sessions": 144,
+          "db_path": "/Users/hu/WorkBuddy/2026-08-06-16-02-06/aml-retriever/eval_out/_work/L5_plus_weighted_rrf.db"
+        }
+      },
+      "overall": {
+        "queries": 192,
+        "recall@20": 1.0,
+        "recall@100": 1.0,
+        "mrr": 0.6631,
+        "distractor_leak@10": 0.5312,
+        "avg_returned": 63.18
+      },
+      "by_kind": {
+        "absent": {
+          "queries": 48,
+          "note": "gold 为空，不计入 Recall/MRR",
+          "avg_returned": 100.0
+        },
+        "knowledge_update": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.9163,
+          "distractor_leak@10": 0.5625,
+          "avg_returned": 28.98
+        },
+        "multi_session": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.6281,
+          "distractor_leak@10": null,
+          "avg_returned": 37.15
+        },
+        "single_hop": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.5687,
+          "distractor_leak@10": null,
+          "avg_returned": 88.21
+        },
+        "temporal": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.5392,
+          "distractor_leak@10": 0.5,
+          "avg_returned": 98.38
+        }
+      },
+      "by_difficulty": {
+        "paraphrase": {
+          "queries": 96,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.5663,
+          "distractor_leak@10": 0.1667,
+          "avg_returned": 66.25
+        },
+        "plain": {
+          "queries": 96,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.7599,
+          "distractor_leak@10": 0.8958,
+          "avg_returned": 60.1
+        }
+      },
+      "latency": {
+        "count": 240,
+        "mean_ms": 8.753,
+        "p50_ms": 9.441,
+        "p95_ms": 15.309,
+        "p99_ms": 16.375,
+        "max_ms": 19.546
+      }
+    },
+    {
+      "stage": "L6_temporal_intent_ctrl",
+      "flags": {
+        "views": true,
+        "exact": true,
+        "datenum": true,
+        "entity": true,
+        "rerank": true,
+        "temporal_intent": true,
+        "rrf": true,
+        "dedup": true,
+        "use_options": true,
+        "exact_scan": false,
+        "vector": false
+      },
+      "skipped": false,
+      "skip_reason": "",
+      "index": {
+        "add_calls": 288,
+        "messages": 5184,
+        "elapsed_s": 9.418,
+        "messages_per_s": 550.5,
+        "rows": {
+          "messages": 5184,
+          "views": 3024,
+          "users": 48,
+          "sessions": 144,
+          "db_path": "/Users/hu/WorkBuddy/2026-08-06-16-02-06/aml-retriever/eval_out/_work/L6_temporal_intent_ctrl.db"
+        }
+      },
+      "overall": {
+        "queries": 192,
+        "recall@20": 0.9922,
+        "recall@100": 1.0,
+        "mrr": 0.6561,
+        "distractor_leak@10": 0.3958,
+        "avg_returned": 63.19
+      },
+      "by_kind": {
+        "absent": {
+          "queries": 48,
+          "note": "gold 为空，不计入 Recall/MRR",
+          "avg_returned": 100.0
+        },
+        "knowledge_update": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.9184,
+          "distractor_leak@10": 0.2917,
+          "avg_returned": 29.02
+        },
+        "multi_session": {
+          "queries": 48,
+          "recall@20": 0.9688,
+          "recall@100": 1.0,
+          "mrr": 0.5967,
+          "distractor_leak@10": null,
+          "avg_returned": 37.17
+        },
+        "single_hop": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.5687,
+          "distractor_leak@10": null,
+          "avg_returned": 88.21
+        },
+        "temporal": {
+          "queries": 48,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.5407,
+          "distractor_leak@10": 0.5,
+          "avg_returned": 98.38
+        }
+      },
+      "by_difficulty": {
+        "paraphrase": {
+          "queries": 96,
+          "recall@20": 0.9844,
+          "recall@100": 1.0,
+          "mrr": 0.5514,
+          "distractor_leak@10": 0.1667,
+          "avg_returned": 66.28
+        },
+        "plain": {
+          "queries": 96,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.7609,
+          "distractor_leak@10": 0.625,
+          "avg_returned": 60.1
+        }
+      },
+      "latency": {
+        "count": 240,
+        "mean_ms": 8.672,
+        "p50_ms": 9.459,
+        "p95_ms": 14.555,
+        "p99_ms": 15.166,
+        "max_ms": 16.644
+      }
+    },
+    {
+      "stage": "L7_plus_vector",
+      "flags": {
+        "views": true,
+        "exact": true,
+        "datenum": true,
+        "entity": true,
+        "rerank": true,
+        "temporal_intent": false,
+        "rrf": true,
+        "dedup": true,
+        "use_options": true,
+        "exact_scan": false,
+        "vector": true
+      },
+      "skipped": true,
+      "skip_reason": "vector backend unavailable: no local vector dependency (numpy/sentence_transformers/faiss) importable",
+      "index": {},
+      "overall": {},
+      "by_kind": {},
+      "by_difficulty": {},
+      "latency": {}
+    }
+  ]
+}

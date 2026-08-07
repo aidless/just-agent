@@ -1,0 +1,107 @@
+{
+  "scan": "temporal",
+  "label": "时间意图放大开关扫描",
+  "generated_at": "2026-08-07T07:29:53+0800",
+  "scale": "medium",
+  "seed": 20260806,
+  "top_k": 100,
+  "difficulties": [
+    "plain",
+    "paraphrase",
+    "mixed"
+  ],
+  "environment": {
+    "python": "3.13.12",
+    "platform": "macOS-26.5-arm64-arm-64bit-Mach-O",
+    "sqlite_library_version": "3.50.4",
+    "third_party_packages_installed": false,
+    "network_access_used": false
+  },
+  "index_shared_across_points": true,
+  "rows": [
+    {
+      "scan": "temporal",
+      "difficulty": "plain",
+      "point": "temporal_intent_off",
+      "queries": 192,
+      "recall@20": 1.0,
+      "recall@100": 1.0,
+      "mrr": 0.7613,
+      "distractor_leak@10": 0.7917,
+      "mrr_temporal": 1.0,
+      "recall@20_temporal": 1.0,
+      "p50_ms": 9.12,
+      "p95_ms": 16.721
+    },
+    {
+      "scan": "temporal",
+      "difficulty": "plain",
+      "point": "temporal_intent_on",
+      "queries": 192,
+      "recall@20": 1.0,
+      "recall@100": 1.0,
+      "mrr": 0.7623,
+      "distractor_leak@10": 0.6354,
+      "mrr_temporal": 1.0,
+      "recall@20_temporal": 1.0,
+      "p50_ms": 9.78,
+      "p95_ms": 17.213
+    },
+    {
+      "scan": "temporal",
+      "difficulty": "paraphrase",
+      "point": "temporal_intent_off",
+      "queries": 192,
+      "recall@20": 1.0,
+      "recall@100": 1.0,
+      "mrr": 0.5687,
+      "distractor_leak@10": 0.1667,
+      "mrr_temporal": 0.0771,
+      "recall@20_temporal": 1.0,
+      "p50_ms": 10.58,
+      "p95_ms": 16.323
+    },
+    {
+      "scan": "temporal",
+      "difficulty": "paraphrase",
+      "point": "temporal_intent_on",
+      "queries": 192,
+      "recall@20": 0.9896,
+      "recall@100": 1.0,
+      "mrr": 0.5591,
+      "distractor_leak@10": 0.1562,
+      "mrr_temporal": 0.0809,
+      "recall@20_temporal": 1.0,
+      "p50_ms": 10.561,
+      "p95_ms": 15.042
+    },
+    {
+      "scan": "temporal",
+      "difficulty": "mixed",
+      "point": "temporal_intent_off",
+      "queries": 192,
+      "recall@20": 1.0,
+      "recall@100": 1.0,
+      "mrr": 0.6631,
+      "distractor_leak@10": 0.5312,
+      "mrr_temporal": 0.5392,
+      "recall@20_temporal": 1.0,
+      "p50_ms": 10.259,
+      "p95_ms": 16.649
+    },
+    {
+      "scan": "temporal",
+      "difficulty": "mixed",
+      "point": "temporal_intent_on",
+      "queries": 192,
+      "recall@20": 0.9922,
+      "recall@100": 1.0,
+      "mrr": 0.6561,
+      "distractor_leak@10": 0.3958,
+      "mrr_temporal": 0.5407,
+      "recall@20_temporal": 1.0,
+      "p50_ms": 9.976,
+      "p95_ms": 15.532
+    }
+  ]
+}
