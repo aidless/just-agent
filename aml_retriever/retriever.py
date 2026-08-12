@@ -553,7 +553,7 @@ class RetrieverDB:
             part = msg_ids[i : i + chunk]
             ph = ",".join("?" * len(part))
             for r in con.execute(
-                f"SELECT id, 'message' AS view, content, created_at, ts_ms, session_id, seq "
+                f"SELECT id, 'message' AS view, role, content, created_at, ts_ms, session_id, seq "
                 f"FROM messages WHERE id IN ({ph}) AND user_id=?",
                 (*part, user_id),
             ).fetchall():
@@ -564,7 +564,7 @@ class RetrieverDB:
             part = view_ids[i : i + chunk]
             ph = ",".join("?" * len(part))
             for r in con.execute(
-                f"SELECT view_id AS id, view_type AS view, content, created_at, "
+                f"SELECT view_id AS id, view_type AS view, NULL AS role, content, created_at, "
                 f"session_id, start_seq AS seq, source_ids, NULL AS ts_ms "
                 f"FROM views WHERE view_id IN ({ph}) AND user_id=?",
                 (*part, user_id),
@@ -599,7 +599,7 @@ class RetrieverDB:
         # 相对新近度：把候选集内的时间戳线性归一到 [0, 1]。
         # 绝对年龄在"整批语料都很老"时会退化成常数，无法区分新旧证据。
         temporal_intent = (
-            self.flags.get("temporal_intent", True) and features.has_temporal_intent(query)
+            self.flags.get("temporal_intent", False) and features.has_temporal_intent(query)
         )
         recency_weight = (
             float(getattr(self.config, "recency_weight_intent", W_RECENCY_INTENT))
@@ -676,12 +676,32 @@ class RetrieverDB:
             rec["score"] = score
             rec["flags"] = flags
 
+        if (
+            self.flags.get("preference_role_boost", False)
+            and features.has_preference_intent(query)
+        ):
+            weight = float(getattr(self.config, "preference_role_weight", 14.0))
+            for rec in records:
+                if (
+                    rec["view"] == "message"
+                    and str(rec.get("role") or "").lower() == "user"
+                    and features.has_direct_preference_statement(rec.get("content") or "")
+                ):
+                    rec["score"] += weight
+                    if "direct_user_preference" not in rec["flags"]:
+                        rec["flags"].append("direct_user_preference")
+
         if self.flags.get("rerank", True):
             self._mark_conflicts(records)
         if self.flags.get("supersession", False):
             # 用「原始」时间意图判定，不受 flags["temporal_intent"] 影响：
             # 覆写检测与新近度放大是两个独立机制，前者不应被后者的开关连带关掉。
-            self._mark_supersession(records, features.has_temporal_intent(query))
+            self._mark_supersession(
+                records,
+                features.has_temporal_intent(query),
+                query=query,
+                require_update_cue=self.flags.get("supersession_update_guard", False),
+            )
         return records
 
     @staticmethod
@@ -755,7 +775,14 @@ class RetrieverDB:
         """
         return frozenset(t for t in features.tokenize(text or "") if len(t) >= 2)
 
-    def _mark_supersession(self, records, temporal_intent: bool) -> None:
+    def _mark_supersession(
+        self,
+        records,
+        temporal_intent: bool,
+        *,
+        query: str = "",
+        require_update_cue: bool = False,
+    ) -> None:
         """覆写检测：话题高度重合的两条消息中，较晚的一条视为覆写较早的一条。
 
         与 `_mark_conflicts` 的区别：后者要求出现**不同的数字/日期**，
@@ -774,22 +801,23 @@ class RetrieverDB:
         把与时间无关的查询的正确答案挤下去（实测 single_hop|paraphrase
         MRR 1.0 → 0.21）。
 
-        ⚠️ 默认 **disabled**。跨 3 seed 消融（docs/EVAL.md 附录 C）显示它
+        ⚠️ 仅靠结构判断、使用历史 18/6 权重的 L8 版本默认 **disabled**。跨 3 seed 消融显示它
         在合成集上净负：temporal|paraphrase 稳定 +0.10，但整体 MRR −0.026~−0.034。
         失败根因是**本方法的能力上限**，不是参数没调好：仅凭「话题重合 + 时间更晚」
         无法区分"真正的后续更新"与"对同一话题的无关后续提及"。合成集里存在
         与 gold 同项目名、但时间更晚的普通陈述，本方法会把它判成覆写者并抬到 gold 之上
         （knowledge_update|paraphrase −0.21）。
-        要真正分开二者，需要识别显式更新措辞（"最新口径/已上调/作废/改成了/不再"）。
-        那等于把判据绑定到本合成语料的措辞习惯上，在官方数据上的表现 **unknown**，
-        故不做，也不默认启用。
+        v1.1 的 ``require_update_cue`` 会进一步要求较新消息带通用更新语义，
+        并阻止数值更新干扰非数值型查询。该保护不包含评测实体或答案值；
+        保守 4/1 权重在本地三 seed 过门后与 supersession 组合启用，
+        但在官方数据上的表现仍是 **unknown**。
         """
         if not temporal_intent:
             return
         cfg = self.config
         min_overlap = float(getattr(cfg, "supersession_min_overlap", 0.5))
-        weight = float(getattr(cfg, "supersession_weight", 18.0))
-        penalty = float(getattr(cfg, "supersession_penalty", 6.0))
+        weight = float(getattr(cfg, "supersession_weight", 4.0))
+        penalty = float(getattr(cfg, "supersession_penalty", 1.0))
         max_pairs = int(getattr(cfg, "supersession_max_pairs", 40))
 
         # 只比较原始消息：聚合视图天然与其成员高度重合，会产生虚假覆写对。
@@ -805,6 +833,7 @@ class RetrieverDB:
 
         superseded: set[str] = set()
         supersedes: set[str] = set()
+        explicit_updates: set[str] = set()
         for i in range(len(pool)):
             a = pool[i]
             sig_a = sigs[a["id"]]
@@ -831,8 +860,30 @@ class RetrieverDB:
                 if ea == eb:
                     continue
                 newer, older = (b, a) if eb > ea else (a, b)
+                if require_update_cue and not features.has_update_cue(newer["content"]):
+                    continue
+                # 数值/日期更新不能仅凭共享项目名干扰“谁负责/偏好什么”之类查询。
+                # 这只是答案类型保护：不删除候选，也不包含任何评测实体或答案值。
+                structured_types: set[str] = set()
+                if features.extract_non_date_numbers(newer["content"]):
+                    structured_types.add("numeric")
+                if features.extract_dates(newer["content"]):
+                    structured_types.add("date")
+                query_types: set[str] = set()
+                if features.has_numeric_value_intent(query):
+                    query_types.add("numeric")
+                if features.has_date_value_intent(query):
+                    query_types.add("date")
+                if (
+                    require_update_cue
+                    and structured_types
+                    and structured_types.isdisjoint(query_types)
+                ):
+                    continue
                 supersedes.add(newer["id"])
                 superseded.add(older["id"])
+                if require_update_cue:
+                    explicit_updates.add(newer["id"])
 
         # 同时被判为「覆写者」和「被覆写者」的记录处于更新链中间，不加不减，
         # 避免链式更新时中间态被误抬。
@@ -843,6 +894,8 @@ class RetrieverDB:
                 rec["score"] += weight
                 if "supersedes_earlier" not in rec["flags"]:
                     rec["flags"].append("supersedes_earlier")
+                if rid in explicit_updates and "explicit_update_cue" not in rec["flags"]:
+                    rec["flags"].append("explicit_update_cue")
             elif is_old and not is_new:
                 rec["score"] -= penalty
                 if "superseded" not in rec["flags"]:

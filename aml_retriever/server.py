@@ -23,7 +23,7 @@ MAX_BODY_BYTES = 32 * 1024 * 1024  # 32MB，覆盖 20 条消息 / 2000 词的分
 
 
 class _Handler(BaseHTTPRequestHandler):
-    server_version = "aml-retriever/1.0"
+    server_version = "aml-retriever/1.1"
     protocol_version = "HTTP/1.1"
 
     # ------------------------------------------------------------- utilities

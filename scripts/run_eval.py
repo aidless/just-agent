@@ -26,7 +26,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from aml_retriever.config import vector_backend_available          # noqa: E402
-from aml_retriever.evaluation import make_dataset, SCALES          # noqa: E402
+from aml_retriever.evaluation import make_dataset, SCALES, SUITES  # noqa: E402
 from aml_retriever.evaluation.dataset import DIFFICULTIES          # noqa: E402
 from aml_retriever.evaluation.harness import (                     # noqa: E402
     ABLATION_LADDER, CONTROL_STAGE, OFFICIAL_TOP_K, PRODUCTION_STAGE, run_ladder,
@@ -103,7 +103,8 @@ def write_report(path: str, payload: dict) -> None:
         "# AML Retriever 离线消融评测报告",
         "",
         f"- 生成时间：{payload['generated_at']}",
-        f"- 数据集：**纯合成**，scale=`{ds['scale']}`，difficulty=`{ds['difficulty']}`，"
+        f"- 数据集：**纯合成**，suite=`{ds.get('suite', 'classic')}`，"
+        f"scale=`{ds['scale']}`，difficulty=`{ds['difficulty']}`，"
         f"seed=`{ds['seed']}`",
         f"- 规模：{ds['users']} users / {ds['sessions']} sessions / "
         f"{ds['messages']} messages / {ds['queries']} queries"
@@ -122,7 +123,7 @@ def write_report(path: str, payload: dict) -> None:
         "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for stage in payload["stages"]:
-        mark = " **(线上默认)**" if stage["stage"] == PRODUCTION_STAGE else ""
+        mark = " **(v1.1 代码默认)**" if stage["stage"] == PRODUCTION_STAGE else ""
         if stage["skipped"]:
             lines.append(f"| `{stage['stage']}`{mark} | 跳过 | 跳过 | 跳过 | 跳过 | — | — | — |")
             continue
@@ -136,10 +137,9 @@ def write_report(path: str, payload: dict) -> None:
         )
     lines += [
         "",
-        f"> `{PRODUCTION_STAGE}` 即 `DEFAULT_FLAGS` 的实际配置（含 rrf_weight_lexical=0.1）。"
-        "`L6_temporal_intent_ctrl` 是**对照组不是推荐档**：它量化「在相对新近度之上再加一层"
-        "时间意图放大」的代价，实测整体 MRR 与 Recall@20 双双下降，"
-        "结论已固化为 `DEFAULT_FLAGS['temporal_intent'] = False`（见 docs/EVAL.md 附录 B）。",
+        f"> `{PRODUCTION_STAGE}` 即 v1.1 `DEFAULT_FLAGS` 的实际配置；"
+        f"`{CONTROL_STAGE}` 是 v1.0 默认基线。`L6_temporal_intent_ctrl` 与 "
+        "`L8_supersession_ctrl` 分别保留为时间意图放大负对照、无保护覆写安全对照。",
     ]
 
     lines += ["", "## 2. 难度分档对比（各档位 MRR）", ""]
@@ -157,27 +157,26 @@ def write_report(path: str, payload: dict) -> None:
             )
             lines.append(f"| `{stage['stage']}` | {cells} |")
 
-    lines += ["", "## 3. 分查询类型明细（线上默认档位）", ""]
-    # 必须锁定 PRODUCTION_STAGE（线上默认），不能取"最后一个未跳过档位"。
-    # 梯度里 L6_temporal_intent_ctrl 排在 L5 之后，用 reversed() 会把**对照组**
-    # 误报成线上默认，让读者以为默认开启了 temporal_intent。
+    lines += ["", "## 3. 分查询类型明细（v1.1 代码默认档位）", ""]
+    # 必须锁定 PRODUCTION_STAGE（代码默认），不能取"最后一个未跳过档位"。
+    # 梯度里仍有多个后置实验档，不能用“最后一个未跳过档位”冒充生产配置。
     final = next(
         (s for s in payload["stages"] if s["stage"] == PRODUCTION_STAGE and not s["skipped"]),
         None,
     )
     fallback_note = ""
     if final is None:
-        # 显式跳过了线上默认档位（如 --stages 白名单）时才回退，并明确标注。
+        # 显式跳过了代码默认档位（如 --stages 白名单）时才回退，并明确标注。
         final = next((s for s in payload["stages"] if not s["skipped"]), None)
         if final is not None:
             fallback_note = (
-                f"（⚠️ 线上默认档位 `{PRODUCTION_STAGE}` 本次未运行，"
-                f"以下为回退展示的 `{final['stage']}`，**不代表线上默认**）"
+                f"（⚠️ v1.1 代码默认档位 `{PRODUCTION_STAGE}` 本次未运行，"
+                f"以下为回退展示的 `{final['stage']}`，**不代表代码默认**）"
             )
     if final:
         lines += [
             f"档位：`{final['stage']}`"
-            + ("（**线上默认 / production**）" if not fallback_note else fallback_note),
+            + ("（**v1.1 代码默认 / production config**）" if not fallback_note else fallback_note),
             "",
             "| 查询类型 | 条数 | Recall@20 | Recall@100 | MRR | 旧值泄漏@10 |",
             "| --- | --- | --- | --- | --- | --- |",
@@ -200,15 +199,15 @@ def write_report(path: str, payload: dict) -> None:
         )
         lines += [
             "",
-            f"> **档位角色**：`{PRODUCTION_STAGE}` = 线上默认（production，`DEFAULT_FLAGS` 实配）；"
-            f"`{CONTROL_STAGE}` = 对照组（control），仅用于量化时间意图放大的代价，"
-            "默认**关闭**，不参与线上返回。",
+            f"> **档位角色**：`{PRODUCTION_STAGE}` = v1.1 代码默认（`DEFAULT_FLAGS` 实配）；"
+            f"`{CONTROL_STAGE}` = v1.0 对照基线（control），其 guarded supersession 默认**关闭**，"
+            "用于量化 v1.1 变更，不参与 v1.1 线上返回。",
         ]
         if control:
             lines.append(
                 f"> 对照组同口径整体指标：MRR={fmt(control['overall'].get('mrr'))}、"
                 f"Recall@20={fmt(control['overall'].get('recall@20'))}"
-                f"（对比线上默认 MRR={fmt(final['overall'].get('mrr'))}、"
+                f"（对比代码默认 MRR={fmt(final['overall'].get('mrr'))}、"
                 f"Recall@20={fmt(final['overall'].get('recall@20'))}）。"
             )
 
@@ -229,7 +228,8 @@ def write_report(path: str, payload: dict) -> None:
         "```bash",
         f"cd {payload['repo']}",
         f"python3 scripts/run_eval.py --scale {ds['scale']} "
-        f"--difficulty {ds['difficulty']} --seed {ds['seed']} --top-k {payload['top_k']}",
+        f"--difficulty {ds['difficulty']} --suite {ds.get('suite', 'classic')} "
+        f"--seed {ds['seed']} --top-k {payload['top_k']}",
         "```",
         "",
         "> 数据集完全由 `seed` 决定，同一 seed 必然复现同一份数据与同一组指标（延迟数除外）。",
@@ -256,12 +256,13 @@ def write_multiseed_report(path: str, payload: dict) -> None:
     seeds = payload["seeds"]
     scale = payload["scale"]
     difficulty = payload["difficulty"]
+    suite = payload.get("suite", "classic")
     top_k = payload["top_k"]
     aggregate = payload["aggregate"]
     per_seed = payload["per_seed"]
     agg_by_stage = {a["stage"]: a for a in aggregate}
 
-    # 每个 seed 的线上默认档位指标，用于 §3 逐 seed 稳定性展示
+    # 每个 seed 的 v1.1 代码默认档位指标，用于 §3 逐 seed 稳定性展示
     seed_summaries = []
     for ps in per_seed:
         for sr in ps:
@@ -285,7 +286,7 @@ def write_multiseed_report(path: str, payload: dict) -> None:
         f"- 评测运行时间：{payload['generated_at']}"
         + (f"（报告重渲染于 {payload['rendered_at']}，指标未重算）"
            if payload.get("rendered_at") else ""),
-        f"- 数据集：**纯合成**，scale=`{scale}`，difficulty=`{difficulty}`",
+        f"- 数据集：**纯合成**，suite=`{suite}`，scale=`{scale}`，difficulty=`{difficulty}`",
         f"- 随机种子：{seeds}（共 {len(seeds)} 个）",
         f"- top_k：{top_k}（官方正式评测口径）",
         f"- 运行环境：Python {payload['environment']['python']} / "
@@ -293,7 +294,7 @@ def write_multiseed_report(path: str, payload: dict) -> None:
         f"FTS5={payload['environment']['fts5']}",
         "",
         "> 本报告的目的**不是**刷分，而是确认指标在合成数据随机种子之间是**稳定的**"
-        "——即单 seed 上的结论（尤其 temporal×paraphrase 短板、L8 supersession 是否缓解）"
+        "——即单 seed 上的结论（尤其 temporal×paraphrase 短板、L9 guarded supersession 是否缓解）"
         "并非某个 seed 的偶然。所有数字均为本机纯合成、零依赖、不联网。",
         "",
         "## 1. 跨 seed 聚合总览（各指标 mean / min / max）",
@@ -302,7 +303,7 @@ def write_multiseed_report(path: str, payload: dict) -> None:
         "| --- | --- | --- | --- | --- | --- | --- |",
     ]
     for a in aggregate:
-        mark = " **(线上默认)**" if a["stage"] == PRODUCTION_STAGE else ""
+        mark = " **(v1.1 代码默认)**" if a["stage"] == PRODUCTION_STAGE else ""
         if a["skipped"]:
             lines.append(f"| `{a['stage']}`{mark} | 跳过 | 跳过 | 跳过 | 跳过 | 跳过 | 跳过 |")
             continue
@@ -315,7 +316,7 @@ def write_multiseed_report(path: str, payload: dict) -> None:
             f"{fmt_agg(lat.get('p50_ms'), 2)} | {fmt_agg(lat.get('p95_ms'), 2)} |"
         )
 
-    # §2：短板聚焦 —— temporal×paraphrase 交叉单元格的 L5/L6/L8 对比
+    # §2：短板聚焦 —— temporal×paraphrase 交叉单元格的 L5/L8/L9 对比
     # 数据集 difficulty=plain 时不存在 paraphrase 难度，回退到 temporal|<difficulty>，
     # 并在标题里说明——否则整节会退化成三行「（无该交叉格）」，读者无法判断是缺数据还是没跑。
     available_cells = {k for a in aggregate for k in (a.get("by_kind_difficulty") or {})}
@@ -344,9 +345,9 @@ def write_multiseed_report(path: str, payload: dict) -> None:
         "| --- | --- | --- | --- | --- |",
     ]
     role_of = {
-        PRODUCTION_STAGE: "线上默认",
-        CONTROL_STAGE: "对照组",
-        "L8_supersession_ctrl": "候选(可消融)",
+        PRODUCTION_STAGE: "v1.1 代码默认",
+        CONTROL_STAGE: "v1.0 基线",
+        "L8_supersession_ctrl": "无保护安全对照",
     }
     for stage in (PRODUCTION_STAGE, CONTROL_STAGE, "L8_supersession_ctrl"):
         a = agg_by_stage.get(stage)
@@ -362,13 +363,13 @@ def write_multiseed_report(path: str, payload: dict) -> None:
         )
     lines += [
         "",
-        "> **可消融安全优化说明**：`L8_supersession_ctrl` 是成对覆写检测（检测同话题的旧→新消息，"
-        "局部抬高新值、轻降旧值），**不猜测官方语义、不安装依赖、不做 confirmed-only 过滤**。",
-        "> 它针对的正是 `temporal`/`knowledge_update` 类的覆写盲区。上表对比 L5（线上默认）与 L8，"
-        "若 L8 在该交叉格上 MRR 不降（或上升）且泄漏不升，则它是对短板的**安全可消融增强**，"
-        "是否纳入默认交由人工决定；若 L8 反而掉点，则保持 `DEFAULT_FLAGS['supersession'] = False`。",
+        "> **v1.1 说明**：`L8_supersession_ctrl` 只看话题重合与时间，作为无保护安全对照；"
+        f"`{PRODUCTION_STAGE}` 进一步要求显式更新语义，并使用保守 4/1 权重。两者都只做软重排，"
+        "不安装依赖、不做 confirmed-only 过滤，也不删除旧证据。",
+        f"> 只有 `{PRODUCTION_STAGE}` 在跨 seed 上同时守住召回门并提升 MRR，才可标记为 v1.1 默认；"
+        "官方数据上的效果仍必须写为 unknown，不能用本合成代理集代替官方验证。",
         "",
-        "## 3. 逐 seed 稳定性（线上默认档位 " + PRODUCTION_STAGE + "）",
+        "## 3. 逐 seed 稳定性（v1.1 代码默认档位 " + PRODUCTION_STAGE + "）",
         "",
         "| seed | Recall@20 | Recall@100 | MRR | 旧值泄漏@10 | p50 (ms) | p95 (ms) |",
         "| --- | --- | --- | --- | --- | --- | --- |",
@@ -400,7 +401,7 @@ def write_multiseed_report(path: str, payload: dict) -> None:
         "```bash",
         f"cd {payload['repo']}",
         f"python3 scripts/run_eval.py --scale {scale} --difficulty {difficulty} "
-        f"--seeds {','.join(str(s) for s in seeds)} --top-k {top_k}",
+        f"--suite {suite} --seeds {','.join(str(s) for s in seeds)} --top-k {top_k}",
         "```",
         "",
         "> 数据集完全由 `seed` 决定，同一组 seed 必然复现同一组指标（延迟数除外）。",
@@ -418,6 +419,7 @@ def write_multiseed_artifacts(out_dir: str, payload: dict) -> list[str]:
     返回写出的文件路径列表。
     """
     scale, difficulty = payload["scale"], payload["difficulty"]
+    suite = payload.get("suite", "classic")
     seeds = payload["seeds"]
 
     # 防御性清洗：老 payload（harness 修复前生成）在 index.rows 里带本机临时库路径。
@@ -426,7 +428,8 @@ def write_multiseed_artifacts(out_dir: str, payload: dict) -> list[str]:
         for r in rows:
             (r.get("index") or {}).get("rows", {}).pop("db_path", None)
 
-    tag = f"{scale}_{difficulty}_multiseed"
+    suite_tag = "" if suite == "classic" else f"_{suite}"
+    tag = f"{scale}_{difficulty}{suite_tag}_multiseed"
     json_path = os.path.join(out_dir, f"ablation_{tag}.json")
     csv_path = os.path.join(out_dir, f"ablation_{tag}.csv")
     per_seed_csv = os.path.join(out_dir, f"ablation_{tag}_per_seed.csv")
@@ -442,7 +445,7 @@ def write_multiseed_artifacts(out_dir: str, payload: dict) -> list[str]:
     for k in quality_keys + latency_keys:
         agg_cols += [f"{k}_mean", f"{k}_min", f"{k}_max"]
     with open(csv_path, "w", encoding="utf-8", newline="") as fh:
-        writer = csv.writer(fh)
+        writer = csv.writer(fh, lineterminator="\n")
         writer.writerow(agg_cols)
         for a in payload["aggregate"]:
             row = [a["stage"], int(bool(a["skipped"])), len(seeds)]
@@ -457,7 +460,7 @@ def write_multiseed_artifacts(out_dir: str, payload: dict) -> list[str]:
     # 逐 seed 明细 CSV：每 (seed, 档位) 一行，保证「每个 seed 的原始数字」可核查，
     # 不含任何语料原文，只有指标。
     with open(per_seed_csv, "w", encoding="utf-8", newline="") as fh:
-        writer = csv.writer(fh)
+        writer = csv.writer(fh, lineterminator="\n")
         writer.writerow(["seed", "stage", "skipped", *quality_keys, *latency_keys])
         for rows in payload["per_seed"]:
             for r in rows:
@@ -480,6 +483,8 @@ def main(argv=None) -> int:
     parser.add_argument("--seeds", default="", help="逗号分隔的多个随机种子，启用跨 seed 聚合模式")
     parser.add_argument("--difficulty", default="mixed", choices=list(DIFFICULTIES),
                         help="查询难度：plain=词面重叠 / paraphrase=改写 / mixed=各半")
+    parser.add_argument("--suite", default="classic", choices=list(SUITES),
+                        help="评测套件：classic=原基准 / v11=原基准加更新与偏好代理题")
     parser.add_argument("--top-k", type=int, default=OFFICIAL_TOP_K, help="检索 top_k")
     parser.add_argument("--out", default="eval_out", help="产物输出目录")
     parser.add_argument("--stages", default="", help="逗号分隔的档位白名单")
@@ -531,6 +536,7 @@ def main(argv=None) -> int:
 
         started = time.time()
         multi = run_ladder_seeds(seeds, scale=args.scale, difficulty=args.difficulty,
+                                 suite=args.suite,
                                  top_k=args.top_k, ladder=ladder, on_stage=on_stage)
 
         # per_seed 转 dict 以便 JSON 序列化，并注入 seed 便于报告溯源
@@ -544,6 +550,7 @@ def main(argv=None) -> int:
             "seeds": seeds,
             "scale": args.scale,
             "difficulty": args.difficulty,
+            "suite": args.suite,
             "top_k": args.top_k,
             "wall_clock_s": round(time.time() - started, 2),
             "environment": environment(),
@@ -557,7 +564,12 @@ def main(argv=None) -> int:
                 print(f"[eval] wrote {p}")
         return 0
 
-    dataset = make_dataset(seed=args.seed, scale=args.scale, difficulty=args.difficulty)
+    dataset = make_dataset(
+        seed=args.seed,
+        scale=args.scale,
+        difficulty=args.difficulty,
+        suite=args.suite,
+    )
     if args.dump_dataset:
         dump_path = (args.dump_dataset if os.path.isabs(args.dump_dataset)
                      else os.path.join(repo, args.dump_dataset))
@@ -602,15 +614,16 @@ def main(argv=None) -> int:
         "stages": [r.to_dict() for r in results],
     }
 
-    tag = f"{args.scale}_{args.difficulty}_{args.seed}"
+    suite_tag = "" if args.suite == "classic" else f"_{args.suite}"
+    tag = f"{args.scale}_{args.difficulty}{suite_tag}_{args.seed}"
     json_path = os.path.join(out_dir, f"ablation_{tag}.json")
     csv_path = os.path.join(out_dir, f"ablation_{tag}.csv")
-    md_path = os.path.join(out_dir, f"REPORT_{args.scale}_{args.difficulty}.md")
+    md_path = os.path.join(out_dir, f"REPORT_{args.scale}_{args.difficulty}{suite_tag}.md")
 
     with open(json_path, "w", encoding="utf-8") as fh:
         json.dump(payload, fh, ensure_ascii=False, indent=2)
     with open(csv_path, "w", encoding="utf-8", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=CSV_COLUMNS)
+        writer = csv.DictWriter(fh, fieldnames=CSV_COLUMNS, lineterminator="\n")
         writer.writeheader()
         for result in results:
             writer.writerow(to_csv_row(result))

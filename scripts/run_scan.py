@@ -31,7 +31,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from aml_retriever.config import RetrieverConfig, DEFAULT_FLAGS          # noqa: E402
-from aml_retriever.evaluation import make_dataset, SCALES                # noqa: E402
+from aml_retriever.evaluation import make_dataset, SCALES, SUITES        # noqa: E402
 from aml_retriever.evaluation.dataset import DIFFICULTIES                # noqa: E402
 from aml_retriever.evaluation import metrics as M                        # noqa: E402
 from aml_retriever.evaluation.harness import (                           # noqa: E402
@@ -40,9 +40,13 @@ from aml_retriever.evaluation.harness import (                           # noqa:
 from aml_retriever.retriever import RetrieverDB                          # noqa: E402
 
 CSV_COLUMNS = [
-    "scan", "difficulty", "point", "queries",
+    "scan", "suite", "difficulty", "point", "queries",
     "recall@20", "recall@100", "mrr", "distractor_leak@10",
     "mrr_temporal", "recall@20_temporal",
+    "mrr_knowledge_update", "recall@20_knowledge_update",
+    "mrr_multi_session", "recall@20_multi_session",
+    "mrr_governance_update_noise", "recall@20_governance_update_noise",
+    "mrr_direct_preference", "recall@20_direct_preference",
     "p50_ms", "p95_ms",
 ]
 
@@ -69,9 +73,35 @@ def temporal_points() -> list[tuple[str, dict]]:
     ]
 
 
+def supersession_points() -> list[tuple[str, dict]]:
+    """v1.1：显式更新保护与成对覆写权重扫描。"""
+    points: list[tuple[str, dict]] = [
+        ("supersession_off", {
+            "flags": {"supersession": False, "supersession_update_guard": False},
+        }),
+        ("supersession_unguarded", {
+            "flags": {"supersession": True, "supersession_update_guard": False},
+        }),
+    ]
+    for weight, penalty in ((4.0, 1.0), (6.0, 2.0), (8.0, 2.0), (10.0, 3.0),
+                            (12.0, 4.0), (14.0, 4.0), (18.0, 6.0)):
+        points.append((
+            f"guarded_w={weight:g}_p={penalty:g}",
+            {
+                "flags": {"supersession": True, "supersession_update_guard": True},
+                "config": {
+                    "supersession_weight": weight,
+                    "supersession_penalty": penalty,
+                },
+            },
+        ))
+    return points
+
+
 SCANS = {
     "rrf": ("加权 RRF 词法权重扫描", rrf_points),
     "temporal": ("时间意图放大开关扫描", temporal_points),
+    "supersession": ("显式更新保护与覆写权重扫描", supersession_points),
 }
 
 
@@ -102,24 +132,33 @@ def evaluate(db: RetrieverDB, dataset, id_map: dict, top_k: int) -> dict:
         })
 
     scored = [r for r in rows if not math.isnan(r["recall@100"])]
-    temporal = [r for r in scored if r["kind"] == "temporal"]
+    by_kind = {
+        kind: [r for r in scored if r["kind"] == kind]
+        for kind in (
+            "temporal", "knowledge_update", "multi_session",
+            "governance_update_noise", "direct_preference",
+        )
+    }
     latency = M.summarize_latency(latencies)
-    return {
+    result = {
         "queries": len(scored),
         "recall@20": _round(M.mean([r["recall@20"] for r in scored])),
         "recall@100": _round(M.mean([r["recall@100"] for r in scored])),
         "mrr": _round(M.mean([r["mrr"] for r in scored])),
         "distractor_leak@10": _round(M.mean([r["leak@10"] for r in scored])),
-        "mrr_temporal": _round(M.mean([r["mrr"] for r in temporal])) if temporal else None,
-        "recall@20_temporal": (_round(M.mean([r["recall@20"] for r in temporal]))
-                               if temporal else None),
         "p50_ms": latency.get("p50_ms"),
         "p95_ms": latency.get("p95_ms"),
     }
+    for kind, subset in by_kind.items():
+        result[f"mrr_{kind}"] = _round(M.mean([r["mrr"] for r in subset])) if subset else None
+        result[f"recall@20_{kind}"] = (
+            _round(M.mean([r["recall@20"] for r in subset])) if subset else None
+        )
+    return result
 
 
 def run_scan(scan: str, *, scale: str, seed: int, difficulties: list[str],
-             top_k: int, quiet: bool = False) -> dict:
+             suite: str, top_k: int, quiet: bool = False) -> dict:
     label, factory = SCANS[scan]
     points = factory()
     results: list[dict] = []
@@ -127,7 +166,9 @@ def run_scan(scan: str, *, scale: str, seed: int, difficulties: list[str],
     workdir = tempfile.mkdtemp(prefix=f"aml-scan-{scan}-")
     try:
         for difficulty in difficulties:
-            dataset = make_dataset(seed=seed, scale=scale, difficulty=difficulty)
+            dataset = make_dataset(
+                seed=seed, scale=scale, difficulty=difficulty, suite=suite
+            )
             db_path = os.path.join(workdir, f"{difficulty}.db")
             # 索引期配置固定为生产默认（views=True），保证各扫描点共享同一索引
             config = RetrieverConfig(db_path=db_path, top_k_default=top_k,
@@ -148,13 +189,15 @@ def run_scan(scan: str, *, scale: str, seed: int, difficulties: list[str],
                         db.flags[key] = value
                     fresh = RetrieverConfig()
                     for attr in ("rrf_k", "rrf_weight_feature", "rrf_weight_lexical",
-                                 "recency_weight", "recency_weight_intent"):
+                                 "recency_weight", "recency_weight_intent",
+                                 "supersession_weight", "supersession_penalty"):
                         setattr(db.config, attr, getattr(fresh, attr))
                     for key, value in (override.get("config") or {}).items():
                         setattr(db.config, key, value)
 
                     metrics = evaluate(db, dataset, id_map, top_k)
-                    row = {"scan": scan, "difficulty": difficulty, "point": name, **metrics}
+                    row = {"scan": scan, "suite": suite, "difficulty": difficulty,
+                           "point": name, **metrics}
                     results.append(row)
                     if not quiet:
                         print(f"[scan] {scan:9s} {difficulty:11s} {name:20s} "
@@ -170,6 +213,7 @@ def run_scan(scan: str, *, scale: str, seed: int, difficulties: list[str],
         "label": label,
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "scale": scale,
+        "suite": suite,
         "seed": seed,
         "top_k": top_k,
         "difficulties": difficulties,
@@ -190,6 +234,7 @@ def main(argv=None) -> int:
     parser.add_argument("--scan", default="rrf", choices=sorted(SCANS) + ["all"])
     parser.add_argument("--scale", default="medium", choices=sorted(SCALES))
     parser.add_argument("--seed", type=int, default=20260806)
+    parser.add_argument("--suite", default="classic", choices=list(SUITES))
     parser.add_argument("--difficulties", default="plain,paraphrase,mixed")
     parser.add_argument("--top-k", type=int, default=OFFICIAL_TOP_K)
     parser.add_argument("--out", default="eval_out")
@@ -208,14 +253,16 @@ def main(argv=None) -> int:
     wanted = sorted(SCANS) if args.scan == "all" else [args.scan]
     for scan in wanted:
         payload = run_scan(scan, scale=args.scale, seed=args.seed,
-                           difficulties=difficulties, top_k=args.top_k, quiet=args.quiet)
-        tag = f"{scan}_{args.scale}_{args.seed}"
+                           difficulties=difficulties, suite=args.suite,
+                           top_k=args.top_k, quiet=args.quiet)
+        suite_tag = "" if args.suite == "classic" else f"_{args.suite}"
+        tag = f"{scan}_{args.scale}{suite_tag}_{args.seed}"
         json_path = os.path.join(out_dir, f"scan_{tag}.json")
         csv_path = os.path.join(out_dir, f"scan_{tag}.csv")
         with open(json_path, "w", encoding="utf-8") as fh:
             json.dump(payload, fh, ensure_ascii=False, indent=2)
         with open(csv_path, "w", encoding="utf-8", newline="") as fh:
-            writer = csv.DictWriter(fh, fieldnames=CSV_COLUMNS)
+            writer = csv.DictWriter(fh, fieldnames=CSV_COLUMNS, lineterminator="\n")
             writer.writeheader()
             for row in payload["rows"]:
                 writer.writerow({k: row.get(k) for k in CSV_COLUMNS})

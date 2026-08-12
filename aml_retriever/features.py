@@ -41,6 +41,52 @@ _TEMPORAL_EN = (
     "these days", "nowadays", "at present", "up to date", "still",
 )
 
+# 通用更新语义。只描述“旧状态被新状态替换”的语言现象，不包含评测实体、
+# 数值或专有名词；用于可选的 supersession 防误判保护。
+_UPDATE_CN = (
+    "更新为", "改为", "改成", "换为", "换成", "调整为", "变更为", "转为",
+    "已上调", "已下调", "上调为", "下调为", "最新口径", "新口径",
+    "作废", "不再", "取代", "替换为", "迁移到", "搬到",
+)
+_UPDATE_EN = (
+    "updated to", "changed to", "switched to", "revised to", "is now",
+    "no longer", "replaced by", "supersedes", "deprecated", "new value",
+    "effective from", "moved to", "migrated to",
+)
+
+# 偏好查询意图与第一人称直接陈述。后者比单纯 role=user 更严格，避免把
+# “某某更喜欢……”这类用户转述误当成用户本人的偏好。
+_PREFERENCE_CN = (
+    "喜欢", "偏好", "首选", "最爱", "爱用", "常用", "习惯", "更愿意", "合我",
+)
+_PREFERENCE_EN = (
+    "prefer", "preference", "favorite", "favourite", "go-to", "usually use",
+    "tend to use", "like to use",
+)
+_NUMERIC_INTENT_CN = (
+    "多少", "几个", "几号", "几点", "金额", "预算", "价格", "费用", "数量",
+    "编号", "号码", "版本", "余额", "额度", "比例", "百分比",
+)
+_NUMERIC_INTENT_EN = (
+    "how much", "how many", "amount", "budget", "price", "cost", "number",
+    "version", "balance", "quota", "percentage", "ratio",
+)
+_DATE_INTENT_CN = (
+    "什么时候", "何时", "哪天", "哪一天", "日期", "几号", "年月日",
+)
+_DATE_INTENT_EN = (
+    "when", "what date", "which date", "release date", "start date", "end date",
+)
+_DIRECT_PREFERENCE_CN_RE = re.compile(
+    r"(?:我|本人|我们)[^。！？!?]{0,16}(?:喜欢|偏好|首选|最爱|爱用|常用|习惯|更愿意)"
+)
+_DIRECT_PREFERENCE_EN_RE = re.compile(
+    r"\b(?:i|we)\s+(?:(?:really|usually|generally)\s+)?"
+    r"(?:prefer|like|favor|favour|use|tend\s+to\s+use)\b"
+    r"|\b(?:my|our)\s+(?:favorite|favourite|preferred|go-to)\b",
+    re.IGNORECASE,
+)
+
 
 def has_temporal_intent(query: str) -> bool:
     """判断查询是否在问「当前状态」。纯确定性规则，无模型依赖。"""
@@ -50,6 +96,56 @@ def has_temporal_intent(query: str) -> bool:
     if any(marker in query for marker in _TEMPORAL_CN):
         return True
     return any(marker in lowered for marker in _TEMPORAL_EN)
+
+
+def has_update_cue(text: str) -> bool:
+    """判断陈述是否显式表达状态替换或旧值失效。"""
+    if not text:
+        return False
+    lowered = text.lower()
+    if any(marker in text for marker in _UPDATE_CN):
+        return True
+    return any(marker in lowered for marker in _UPDATE_EN)
+
+
+def has_preference_intent(text: str) -> bool:
+    """判断查询是否在询问偏好或习惯。"""
+    if not text:
+        return False
+    lowered = text.lower()
+    if any(marker in text for marker in _PREFERENCE_CN):
+        return True
+    return any(marker in lowered for marker in _PREFERENCE_EN)
+
+
+def has_direct_preference_statement(text: str) -> bool:
+    """判断文本是否为第一人称偏好陈述，而非对第三人的转述。"""
+    if not text:
+        return False
+    return bool(
+        _DIRECT_PREFERENCE_CN_RE.search(text)
+        or _DIRECT_PREFERENCE_EN_RE.search(text)
+    )
+
+
+def has_numeric_value_intent(text: str) -> bool:
+    """判断查询是否明确索要金额、数量、编号或版本类数值状态。"""
+    if not text:
+        return False
+    lowered = text.lower()
+    if any(marker in text for marker in _NUMERIC_INTENT_CN):
+        return True
+    return any(marker in lowered for marker in _NUMERIC_INTENT_EN)
+
+
+def has_date_value_intent(text: str) -> bool:
+    """判断查询是否明确索要某个日期或发生时间。"""
+    if not text:
+        return False
+    lowered = text.lower()
+    if any(marker in text for marker in _DATE_INTENT_CN):
+        return True
+    return any(marker in lowered for marker in _DATE_INTENT_EN)
 
 
 def cjk_ngrams(text: str, n: int) -> list[str]:
@@ -103,6 +199,11 @@ def extract_numbers(text: str) -> list[str]:
     return [t.replace(",", "") for t in _NUM_RE.findall(text or "")]
 
 
+def extract_non_date_numbers(text: str) -> list[str]:
+    """提取日期表达式之外的数字，供答案类型保护使用。"""
+    return extract_numbers(_DATE_RE.sub(" ", text or ""))
+
+
 def extract_dates(text: str) -> list[str]:
     return _DATE_RE.findall(text or "")
 
@@ -138,9 +239,15 @@ __all__ = [
     "query_tokens",
     "cjk_ngrams",
     "extract_numbers",
+    "extract_non_date_numbers",
     "extract_dates",
     "extract_phrases",
     "extract_entities",
     "normalize",
     "has_temporal_intent",
+    "has_update_cue",
+    "has_preference_intent",
+    "has_direct_preference_statement",
+    "has_numeric_value_intent",
+    "has_date_value_intent",
 ]

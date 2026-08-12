@@ -1,0 +1,10 @@
+scan,suite,difficulty,point,queries,recall@20,recall@100,mrr,distractor_leak@10,mrr_temporal,recall@20_temporal,mrr_knowledge_update,recall@20_knowledge_update,mrr_multi_session,recall@20_multi_session,mrr_governance_update_noise,recall@20_governance_update_noise,mrr_direct_preference,recall@20_direct_preference,p50_ms,p95_ms
+supersession,classic,mixed,supersession_off,192,0.9974,1.0,0.6791,0.5,0.5521,1.0,0.8897,1.0,0.6462,0.9896,,,,,11.06,16.344
+supersession,classic,mixed,supersession_unguarded,192,0.9974,1.0,0.6834,0.4896,0.5905,1.0,0.879,1.0,0.6354,0.9896,,,,,11.967,17.278
+supersession,classic,mixed,guarded_w=4_p=1,192,0.9974,1.0,0.7004,0.5,0.6372,1.0,0.8897,1.0,0.6462,0.9896,,,,,12.452,17.513
+supersession,classic,mixed,guarded_w=6_p=2,192,0.9974,1.0,0.7004,0.5,0.6372,1.0,0.8897,1.0,0.6462,0.9896,,,,,12.798,20.385
+supersession,classic,mixed,guarded_w=8_p=2,192,0.9974,1.0,0.7004,0.5,0.6372,1.0,0.8897,1.0,0.6462,0.9896,,,,,12.383,17.559
+supersession,classic,mixed,guarded_w=10_p=3,192,0.9974,1.0,0.7004,0.5,0.6372,1.0,0.8897,1.0,0.6462,0.9896,,,,,12.139,17.87
+supersession,classic,mixed,guarded_w=12_p=4,192,0.9974,1.0,0.7004,0.5,0.6372,1.0,0.8897,1.0,0.6462,0.9896,,,,,13.027,19.378
+supersession,classic,mixed,guarded_w=14_p=4,192,0.9974,1.0,0.7086,0.5,0.6701,1.0,0.8897,1.0,0.6462,0.9896,,,,,12.447,19.019
+supersession,classic,mixed,guarded_w=18_p=6,192,0.9974,1.0,0.7086,0.5,0.6701,1.0,0.8897,1.0,0.6462,0.9896,,,,,13.06,20.866

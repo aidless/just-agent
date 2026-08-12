@@ -28,14 +28,15 @@ _L1 = {**_OFF, "use_options": True, "views": True}
 _L2 = {**_L1, "exact": True}
 _L3 = {**_L2, "datenum": True, "entity": True, "rerank": True}
 _L4 = {**_L3, "dedup": True}
-_L5 = {**_L4, "rrf": True}                    # 加权 RRF，与线上默认配置一致
+_L5 = {**_L4, "rrf": True}                    # 加权 RRF，v1.0 默认 / v1.1 直接基线
 _L6 = {**_L5, "temporal_intent": True}        # 对照组：时间意图放大新近度
 _L7 = {**_L5, "vector": True}                 # 可选向量路（依赖不可用时自动跳过）
 _L8 = {**_L5, "supersession": True}           # 候选组：成对覆写检测
+_L9 = {**_L8, "supersession_update_guard": True}  # v1.1 默认：覆写 + 更新保护
+_L10 = {**_L9, "preference_role_boost": True}     # 候选：再加用户偏好证据
 
-# L0→L5 是累进主线，每一级只增不减，L5 即线上默认配置（DEFAULT_FLAGS）。
-# L6 是**对照组而非推荐档**：它量化一个「看起来该有用、实测无用」的机制，
-# 结论已固化为 DEFAULT_FLAGS["temporal_intent"] = False。
+# L0→L5 是 v1.0 累进主线；v1.1 在 L5 上加入受保护覆写形成 L9。
+# L6/L8 是**对照组而非推荐档**：它们分别量化负增益与未受保护的安全代价。
 ABLATION_LADDER: list[tuple[str, dict]] = [
     ("L0_lexical_baseline",     {**_OFF, "use_options": True}),
     ("L1_plus_views",           _L1),
@@ -46,16 +47,19 @@ ABLATION_LADDER: list[tuple[str, dict]] = [
     ("L6_temporal_intent_ctrl", _L6),
     ("L7_plus_vector",          _L7),
     ("L8_supersession_ctrl",    _L8),
+    ("L9_guarded_supersession", _L9),
+    ("L10_preference_ctrl",     _L10),
 ]
 
 # 主线档位（累进），对照组不参与「只增不减」检查
 MAINLINE_STAGES = ("L0_lexical_baseline", "L1_plus_views", "L2_plus_exact",
-                   "L3_plus_context", "L4_plus_dedup", "L5_plus_weighted_rrf")
+                   "L3_plus_context", "L4_plus_dedup", "L5_plus_weighted_rrf",
+                   "L9_guarded_supersession")
 # 生产默认配置对应的档位名，供报告标注
-PRODUCTION_STAGE = "L5_plus_weighted_rrf"
-# 对照组档位名。报告必须把它与 PRODUCTION_STAGE 区分展示，
-# 不得因为它在梯度里排在 L5 之后就被当成"最终/线上"档位。
-CONTROL_STAGE = "L6_temporal_intent_ctrl"
+PRODUCTION_STAGE = "L9_guarded_supersession"
+# v1.1 生产档的直接对照组：原 v1.0 默认 L5。L6/L8 继续分别保留为
+# 时间意图放大负对照与无保护覆写安全对照，但不再承担“生产基线”角色。
+CONTROL_STAGE = "L5_plus_weighted_rrf"
 
 
 @dataclass
@@ -316,6 +320,7 @@ def aggregate_across_seeds(per_seed: list[list[StageResult]]) -> list[dict]:
 
 
 def run_ladder_seeds(seeds: list[int], *, scale: str, difficulty: str,
+                     suite: str = "classic",
                      top_k: int = OFFICIAL_TOP_K,
                      ladder: list[tuple[str, dict]] | None = None,
                      on_stage=None) -> dict:
@@ -329,7 +334,7 @@ def run_ladder_seeds(seeds: list[int], *, scale: str, difficulty: str,
     per_seed: list[list[StageResult]] = []
     try:
         for seed in seeds:
-            ds = make_dataset(seed=seed, scale=scale, difficulty=difficulty)
+            ds = make_dataset(seed=seed, scale=scale, difficulty=difficulty, suite=suite)
             results = run_ladder(ds, workdir=workdir, top_k=top_k, ladder=ladder,
                                  on_stage=on_stage)
             per_seed.append(results)
@@ -340,6 +345,7 @@ def run_ladder_seeds(seeds: list[int], *, scale: str, difficulty: str,
         "seeds": list(seeds),
         "scale": scale,
         "difficulty": difficulty,
+        "suite": suite,
         "top_k": top_k,
         "per_seed": per_seed,
         "aggregate": aggregate_across_seeds(per_seed),

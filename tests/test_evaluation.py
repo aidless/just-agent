@@ -14,7 +14,7 @@ import unittest
 
 from aml_retriever.config import DEFAULT_FLAGS
 from aml_retriever.evaluation import metrics as M
-from aml_retriever.evaluation.dataset import DIFFICULTIES, SCALES, make_dataset
+from aml_retriever.evaluation.dataset import DIFFICULTIES, SCALES, SUITES, make_dataset
 from aml_retriever.evaluation.harness import (
     ABLATION_LADDER, CONTROL_STAGE, MAINLINE_STAGES, PRODUCTION_STAGE,
     build_index, run_stage,
@@ -93,6 +93,20 @@ class TestDataset(unittest.TestCase):
             make_dataset(scale="nope")
         with self.assertRaises(ValueError):
             make_dataset(difficulty="nope")
+        with self.assertRaises(ValueError):
+            make_dataset(suite="nope")
+
+    def test_v11_suite_appends_probes_without_changing_classic(self):
+        classic = make_dataset(seed=3, scale="smoke", suite="classic")
+        v11 = make_dataset(seed=3, scale="smoke", suite="v11")
+        self.assertEqual(classic.suite, "classic")
+        self.assertEqual(v11.suite, "v11")
+        self.assertEqual(len(v11.sessions), len(classic.sessions) + len(classic.users))
+        self.assertEqual(len(v11.queries), len(classic.queries) + 2 * len(classic.users))
+        kinds = v11.kind_counts()
+        self.assertEqual(kinds["governance_update_noise"], len(v11.users))
+        self.assertEqual(kinds["direct_preference"], len(v11.users))
+        self.assertNotIn("governance_update_noise", classic.kind_counts())
 
     def test_gold_keys_point_at_real_slots(self):
         """每个 gold 键必须能在数据集中定位到一条真实消息。"""
@@ -224,17 +238,27 @@ class TestLadderIntegrity(unittest.TestCase):
             self.assertTrue(previous <= enabled, f"{name} 关掉了上一级的开关")
             previous = enabled
 
-    def test_control_stages_differ_from_production_by_one_flag(self):
-        """对照组必须只比生产档多开一个开关，否则归因不成立。"""
+    def test_control_stages_have_isolated_deltas(self):
+        """每个实验档必须相对其直接基线只改变声明的开关。"""
         table = dict(ABLATION_LADDER)
-        base = {k for k, v in table[PRODUCTION_STAGE].items() if v}
-        for name in ("L6_temporal_intent_ctrl", "L7_plus_vector"):
+        legacy = {k for k, v in table["L5_plus_weighted_rrf"].items() if v}
+        for name in ("L6_temporal_intent_ctrl", "L7_plus_vector",
+                     "L8_supersession_ctrl"):
             enabled = {k for k, v in table[name].items() if v}
-            self.assertEqual(len(enabled - base), 1, f"{name} 相对生产档改动了多个开关")
-            self.assertFalse(base - enabled, f"{name} 关掉了生产档已开的开关")
+            self.assertEqual(len(enabled - legacy), 1, f"{name} 相对 L5 改动了多个开关")
+            self.assertFalse(legacy - enabled, f"{name} 关掉了 L5 已开的开关")
+
+        production = {k for k, v in table[PRODUCTION_STAGE].items() if v}
+        preference = {k for k, v in table["L10_preference_ctrl"].items() if v}
+        self.assertEqual(preference - production, {"preference_role_boost"})
+        self.assertFalse(production - preference)
+        guarded = {k for k, v in table["L9_guarded_supersession"].items() if v}
+        unguarded = {k for k, v in table["L8_supersession_ctrl"].items() if v}
+        self.assertEqual(guarded - unguarded, {"supersession_update_guard"})
+        self.assertFalse(unguarded - guarded)
 
     def test_production_stage_matches_default_flags(self):
-        """线上默认配置必须真的对应梯度里被标注的那一档，否则报告会误导人。"""
+        """代码默认配置必须真的对应梯度里被标注的那一档，否则报告会误导人。"""
         stage = dict(dict(ABLATION_LADDER)[PRODUCTION_STAGE])
         for key, value in DEFAULT_FLAGS.items():
             self.assertEqual(bool(stage.get(key, False)), bool(value),
@@ -290,10 +314,10 @@ def _fake_payload(stages: list[dict]) -> dict:
 
 
 class TestReportStageRoles(unittest.TestCase):
-    """报告 section 3 必须锁定 L5=线上默认、L6=对照组。
+    """报告 section 3 必须锁定声明的生产档与直接对照档。
 
     历史缺陷：section 3 用 reversed(stages) 取"最后一个未跳过档位"，
-    而梯度里 L6 排在 L5 之后，导致对照组被渲染成线上默认档位。
+    会让后置实验档冒充代码默认。
     """
 
     def setUp(self):
@@ -314,18 +338,18 @@ class TestReportStageRoles(unittest.TestCase):
         return body.split("## 4.")[0]
 
     def test_section3_picks_production_not_last_stage(self):
-        """即使 L6 排在 L5 之后，section 3 也必须展示 L5。"""
+        """即使输入顺序把对照档放最后，也必须展示声明的生产档。"""
         text = self._render([
             _stage_payload(PRODUCTION_STAGE, 0.6631, 1.0),
             _stage_payload(CONTROL_STAGE, 0.4000, 0.9),
         ])
         section = self._section3(text)
         self.assertIn(f"档位：`{PRODUCTION_STAGE}`", section)
-        self.assertIn("线上默认", section)
+        self.assertIn("代码默认", section)
         self.assertNotIn(f"档位：`{CONTROL_STAGE}`", section)
 
     def test_section3_marks_control_role_explicitly(self):
-        """section 3 必须写明 L6 是对照组且默认关闭。"""
+        """section 3 必须写明直接基线是对照组且增强默认关闭。"""
         section = self._section3(self._render([
             _stage_payload(PRODUCTION_STAGE, 0.6631, 1.0),
             _stage_payload(CONTROL_STAGE, 0.4000, 0.9),
@@ -344,11 +368,11 @@ class TestReportStageRoles(unittest.TestCase):
                           if f"`{PRODUCTION_STAGE}`" in l][0]
         control_row = [l for l in overview.splitlines()
                        if f"`{CONTROL_STAGE}`" in l][0]
-        self.assertIn("线上默认", production_row)
-        self.assertNotIn("线上默认", control_row)
+        self.assertIn("代码默认", production_row)
+        self.assertNotIn("代码默认", control_row)
 
     def test_skipped_production_falls_back_with_warning(self):
-        """线上默认档位未运行时必须显式告警，不得静默冒充。"""
+        """代码默认档位未运行时必须显式告警，不得静默冒充。"""
         skipped = _stage_payload(PRODUCTION_STAGE, 0.0, 0.0)
         skipped["skipped"] = True
         section = self._section3(self._render([
@@ -356,7 +380,7 @@ class TestReportStageRoles(unittest.TestCase):
             skipped,
         ]))
         self.assertIn("L0_lexical_baseline", section)
-        self.assertIn("不代表线上默认", section)
+        self.assertIn("不代表代码默认", section)
 
 
 def _agg(mean: float, lo: float, hi: float, n: int = 3) -> dict:

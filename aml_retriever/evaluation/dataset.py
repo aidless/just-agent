@@ -3,7 +3,7 @@
 设计约束
 --------
 * **纯合成**：人名、地名、项目名全部虚构，不含任何真实个人数据或外部语料。
-* **确定性**：同一 ``(seed, scale, difficulty)`` 必然产出逐字节相同的数据集。
+* **确定性**：同一 ``(seed, scale, difficulty, suite)`` 必然产出逐字节相同的数据集。
 * **非平凡**：每个用户有一个固定"主角"，gold 事实被同主角、同句式、
   仅换属性名的**硬干扰项**包围（工位编号 / 门禁卡编号 / 内线号码 …）。
   仅靠"命中人名"无法定位答案，必须区分属性语义。
@@ -57,6 +57,7 @@ CHITCHAT = [
 ]
 
 DIFFICULTIES = ("plain", "paraphrase", "mixed")
+SUITES = ("classic", "v11")
 
 
 @dataclass
@@ -75,6 +76,7 @@ class Dataset:
     seed: int
     scale: str
     difficulty: str
+    suite: str
     users: list[str]
     sessions: list[dict]
     queries: list[Query]
@@ -104,6 +106,7 @@ class Dataset:
             "seed": self.seed,
             "scale": self.scale,
             "difficulty": self.difficulty,
+            "suite": self.suite,
             "users": len(self.users),
             "sessions": len(self.sessions),
             "messages": self.message_count,
@@ -138,12 +141,14 @@ def _msg(role: str, content: str, ts: int) -> dict:
 
 
 def make_dataset(seed: int = 20260806, scale: str = "small",
-                 difficulty: str = "mixed") -> Dataset:
+                 difficulty: str = "mixed", suite: str = "classic") -> Dataset:
     """生成确定性合成数据集。"""
     if scale not in SCALES:
         raise ValueError(f"unknown scale: {scale}; expected one of {sorted(SCALES)}")
     if difficulty not in DIFFICULTIES:
         raise ValueError(f"unknown difficulty: {difficulty}; expected one of {DIFFICULTIES}")
+    if suite not in SUITES:
+        raise ValueError(f"unknown suite: {suite}; expected one of {SUITES}")
 
     n_users, n_sessions, n_messages = SCALES[scale]
     rng = random.Random(seed)
@@ -242,12 +247,77 @@ def make_dataset(seed: int = 20260806, scale: str = "small",
         queries.append(Query(f"q{u_idx:04d}-absent", user_id, "absent", level,
                              f"{hero}的护照号码是多少？", [], []))
 
+        if suite == "v11":
+            # 独立 v1.1 代理集：不改写经典查询，只追加两个明确的失败模式。
+            # 这些语句和实体均为合成数据；规则不可读取 qid/gold/distractor。
+            probe_session_id = f"{user_id}-v11"
+            probe_base = _BASE_TS + (u_idx * 10_000 + n_sessions * 3_000 + 1_000) * _MINUTE
+            old_budget = (u_idx + 7) * 1900
+            new_budget = (u_idx + 7) * 3700
+            direct_tool = TOOLS[(u_idx + seed) % len(TOOLS)]
+            suggested_tool = TOOLS[(u_idx + seed + 1) % len(TOOLS)]
+            third_party_tool = TOOLS[(u_idx + seed + 2) % len(TOOLS)]
+            probe_messages = [
+                _msg("user", f"{project}预算口径是 {old_budget} 元。", probe_base),
+                _msg("assistant", "我先把这一项记到待办里。", probe_base + 7 * _MINUTE),
+                _msg(
+                    "user",
+                    f"{project}预算口径已更新为 {new_budget} 元，旧的 {old_budget} 元作废。",
+                    probe_base + 14 * _MINUTE,
+                ),
+                _msg(
+                    "assistant",
+                    f"如果让我建议，我会用{suggested_tool}做样本抽检。",
+                    probe_base + 21 * _MINUTE,
+                ),
+                _msg(
+                    "user",
+                    f"我做样本抽检时更喜欢用{direct_tool}，这是我的常用工具。",
+                    probe_base + 28 * _MINUTE,
+                ),
+                _msg(
+                    "user",
+                    f"{hero}做样本抽检时更喜欢用{third_party_tool}。",
+                    probe_base + 35 * _MINUTE,
+                ),
+                _msg(
+                    "user",
+                    f"{project}预算口径已更新进说明文档，数值保持不变。",
+                    probe_base + 42 * _MINUTE,
+                ),
+                _msg("assistant", "说明文档已经归档。", probe_base + 49 * _MINUTE),
+            ]
+            user_sessions.append({
+                "user_id": user_id,
+                "session_id": probe_session_id,
+                "messages": probe_messages,
+            })
+            key = lambda idx: f"{probe_session_id}#{idx}"
+            queries.append(Query(
+                f"q{u_idx:04d}-update-noise",
+                user_id,
+                "governance_update_noise",
+                level,
+                f"{project}目前生效的预算口径是多少？",
+                [key(2)],
+                [key(0), key(6)],
+            ))
+            queries.append(Query(
+                f"q{u_idx:04d}-direct-preference",
+                user_id,
+                "direct_preference",
+                level,
+                "我做样本抽检时更喜欢用什么工具？",
+                [key(4)],
+                [key(3), key(5)],
+            ))
+
         for sess in user_sessions:
             sess.pop("_base", None)
             sessions.append(sess)
 
-    return Dataset(seed=seed, scale=scale, difficulty=difficulty,
+    return Dataset(seed=seed, scale=scale, difficulty=difficulty, suite=suite,
                    users=users, sessions=sessions, queries=queries)
 
 
-__all__ = ["Dataset", "Query", "make_dataset", "SCALES", "DIFFICULTIES"]
+__all__ = ["Dataset", "Query", "make_dataset", "SCALES", "DIFFICULTIES", "SUITES"]

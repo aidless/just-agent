@@ -39,8 +39,16 @@ DEFAULT_FLAGS: dict[str, bool] = {
     # 判定后者覆写前者，抬高后者、轻降前者。与 temporal_intent 的区别是
     # 它不做全局新近度放大，只在**成对冗余**成立时局部生效，因此不会误伤
     # 「问当前状态但答案本身较旧」的查询。默认值由 Phase D 跨 seed 消融决定，
-    # 证据见 docs/EVAL.md 附录 C。
-    "supersession": False,
+    # v1.1 只启用“覆写 + 显式更新保护”的组合；无保护的覆写仍是不安全对照。
+    # medium/mixed 三 seed 下，保守 4/1 权重保持 Recall@20 不退、Recall@100=1，
+    # MRR 每个 seed 均提升。官方数据上的影响仍 unknown，见 docs/EVAL.md 附录 E。
+    "supersession": True,
+    # 显式更新保护：仅允许带通用更新语义（如“更新为 / no longer”）的较新消息
+    # 覆写旧消息。它只在 supersession 同时开启时生效；v1.1 将两者组合启用。
+    "supersession_update_guard": True,
+    # 个性化证据来源：偏好类查询中，轻度抬高用户本人直接陈述，绝不删除
+    # assistant 转述或其他原始证据。代理集虽显示正收益，但场景宽度仍不足，默认关闭。
+    "preference_role_boost": False,
 }
 
 
@@ -80,10 +88,16 @@ class RetrieverConfig:
     # min_overlap 是两条消息「谈的是同一件事」的判定阈值，按 containment
     # （交集 / 较短一方的 token 数，token 取长度≥2 的 n-gram）计算。
     # max_pairs 限制参与两两比较的候选数，界定 O(n^2) 的最坏代价。
-    supersession_weight: float = 18.0
-    supersession_penalty: float = 6.0
+    # v1.1 三 seed 参数扫描的 Pareto 安全点：4/1 保持 Recall@20 不退化，
+    # 同时稳定提升 MRR；14/4 与 18/6 的增益更大但会在一个 seed 上损伤 Recall@20。
+    supersession_weight: float = 4.0
+    supersession_penalty: float = 1.0
     supersession_min_overlap: float = 0.5
     supersession_max_pairs: int = 40
+
+    # 偏好类查询中，“role=user + 第一人称偏好陈述”的软加权。
+    # 只改变排序，不过滤任何候选，且在 RRF 前进入特征路排序。
+    preference_role_weight: float = 14.0
 
     # 一致性 / 并发
     busy_timeout_ms: int = 10000

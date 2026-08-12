@@ -23,6 +23,11 @@
 
   "recency_weight": 8.0,
   "recency_weight_intent": 12.0,
+  "supersession_weight": 4.0,
+  "supersession_penalty": 1.0,
+  "supersession_min_overlap": 0.5,
+  "supersession_max_pairs": 40,
+  "preference_role_weight": 14.0,
 
   "_comment_concurrency": "对齐官方披露：Add 64 workers / Search 32 workers。pool_size 为读连接池容量。",
   "busy_timeout_ms": 10000,
@@ -38,7 +43,7 @@
   "search_path": "/search",
   "health_path": "/health",
 
-  "_comment_flags": "检索增强开关，每项可独立关闭做消融。temporal_intent 与 vector 默认关闭：前者实测负增益，后者本机无可用依赖（unknown）。",
+  "_comment_flags": "检索增强开关，每项可独立关闭做消融。v1.1 默认启用 supersession+update_guard 的受保护组合；preference_role_boost、temporal_intent 与 vector 仍默认关闭。",
   "flags": {
     "views": true,
     "exact": true,
@@ -50,6 +55,9 @@
     "dedup": true,
     "use_options": true,
     "exact_scan": false,
-    "vector": false
+    "vector": false,
+    "supersession": true,
+    "supersession_update_guard": true,
+    "preference_role_boost": false
   }
 }

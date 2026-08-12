@@ -1,0 +1,3143 @@
+{
+  "generated_at": "2026-08-13T01:52:57+0800",
+  "repo": "/Users/hu/Projects/Oh-My-Project/flowgrid-aml-retriever-v11",
+  "mode": "multiseed",
+  "seeds": [
+    20260806,
+    20260807,
+    20260808
+  ],
+  "scale": "medium",
+  "difficulty": "mixed",
+  "suite": "v11",
+  "top_k": 100,
+  "wall_clock_s": 94.23,
+  "environment": {
+    "python": "3.9.6",
+    "implementation": "CPython",
+    "platform": "macOS-26.5-arm64-arm-64bit",
+    "machine": "arm64",
+    "sqlite_library_version": "3.51.0",
+    "fts5": true,
+    "vector_backend_available": true,
+    "vector_backend_reason": "numpy importable",
+    "third_party_packages_installed": false,
+    "network_access_used": false
+  },
+  "per_seed": [
+    [
+      {
+        "stage": "L5_plus_weighted_rrf",
+        "flags": {
+          "views": true,
+          "exact": true,
+          "datenum": true,
+          "entity": true,
+          "rerank": true,
+          "temporal_intent": false,
+          "rrf": true,
+          "dedup": true,
+          "use_options": true,
+          "exact_scan": false,
+          "vector": false,
+          "supersession": false,
+          "supersession_update_guard": false,
+          "preference_role_boost": false
+        },
+        "skipped": false,
+        "skip_reason": "",
+        "index": {
+          "add_calls": 336,
+          "messages": 5568,
+          "elapsed_s": 5.781,
+          "messages_per_s": 963.2,
+          "rows": {
+            "messages": 5568,
+            "views": 3264,
+            "users": 48,
+            "sessions": 192
+          }
+        },
+        "overall": {
+          "queries": 288,
+          "recall@20": 0.9549,
+          "recall@100": 1.0,
+          "mrr": 0.5233,
+          "distractor_leak@10": 0.7552,
+          "avg_returned": 62.08
+        },
+        "by_kind": {
+          "absent": {
+            "queries": 48,
+            "note": "gold 为空，不计入 Recall/MRR",
+            "avg_returned": 100.0
+          },
+          "direct_preference": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5833,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 60.46
+          },
+          "governance_update_noise": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.4826,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 39.81
+          },
+          "knowledge_update": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5507,
+            "distractor_leak@10": 0.5208,
+            "avg_returned": 36.96
+          },
+          "multi_session": {
+            "queries": 48,
+            "recall@20": 0.9583,
+            "recall@100": 1.0,
+            "mrr": 0.5587,
+            "distractor_leak@10": null,
+            "avg_returned": 45.29
+          },
+          "single_hop": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.4391,
+            "distractor_leak@10": null,
+            "avg_returned": 90.31
+          },
+          "temporal": {
+            "queries": 48,
+            "recall@20": 0.7708,
+            "recall@100": 1.0,
+            "mrr": 0.5255,
+            "distractor_leak@10": 0.5,
+            "avg_returned": 99.62
+          }
+        },
+        "by_difficulty": {
+          "paraphrase": {
+            "queries": 144,
+            "recall@20": 0.9097,
+            "recall@100": 1.0,
+            "mrr": 0.3214,
+            "distractor_leak@10": 0.5208,
+            "avg_returned": 63.4
+          },
+          "plain": {
+            "queries": 144,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.7253,
+            "distractor_leak@10": 0.9896,
+            "avg_returned": 60.76
+          }
+        },
+        "by_kind_difficulty": {
+          "direct_preference|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 60.33
+          },
+          "direct_preference|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.6667,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 60.58
+          },
+          "governance_update_noise|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.4653,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 38.83
+          },
+          "governance_update_noise|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 40.79
+          },
+          "knowledge_update|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.2112,
+            "distractor_leak@10": 0.0833,
+            "avg_returned": 31.96
+          },
+          "knowledge_update|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.8902,
+            "distractor_leak@10": 0.9583,
+            "avg_returned": 41.96
+          },
+          "multi_session|paraphrase": {
+            "queries": 24,
+            "recall@20": 0.9167,
+            "recall@100": 1.0,
+            "mrr": 0.1174,
+            "distractor_leak@10": null,
+            "avg_returned": 49.25
+          },
+          "multi_session|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": null,
+            "avg_returned": 41.33
+          },
+          "single_hop|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5833,
+            "distractor_leak@10": null,
+            "avg_returned": 100.0
+          },
+          "single_hop|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.2948,
+            "distractor_leak@10": null,
+            "avg_returned": 80.62
+          },
+          "temporal|paraphrase": {
+            "queries": 24,
+            "recall@20": 0.5417,
+            "recall@100": 1.0,
+            "mrr": 0.051,
+            "distractor_leak@10": 0.0,
+            "avg_returned": 100.0
+          },
+          "temporal|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 99.25
+          }
+        },
+        "latency": {
+          "count": 336,
+          "mean_ms": 13.058,
+          "p50_ms": 13.268,
+          "p95_ms": 21.201,
+          "p99_ms": 21.719,
+          "max_ms": 24.292
+        },
+        "seed": 20260806
+      },
+      {
+        "stage": "L9_guarded_supersession",
+        "flags": {
+          "views": true,
+          "exact": true,
+          "datenum": true,
+          "entity": true,
+          "rerank": true,
+          "temporal_intent": false,
+          "rrf": true,
+          "dedup": true,
+          "use_options": true,
+          "exact_scan": false,
+          "vector": false,
+          "supersession": true,
+          "supersession_update_guard": true,
+          "preference_role_boost": false
+        },
+        "skipped": false,
+        "skip_reason": "",
+        "index": {
+          "add_calls": 336,
+          "messages": 5568,
+          "elapsed_s": 5.677,
+          "messages_per_s": 980.8,
+          "rows": {
+            "messages": 5568,
+            "views": 3264,
+            "users": 48,
+            "sessions": 192
+          }
+        },
+        "overall": {
+          "queries": 288,
+          "recall@20": 0.9931,
+          "recall@100": 1.0,
+          "mrr": 0.5399,
+          "distractor_leak@10": 0.7552,
+          "avg_returned": 62.08
+        },
+        "by_kind": {
+          "absent": {
+            "queries": 48,
+            "note": "gold 为空，不计入 Recall/MRR",
+            "avg_returned": 100.0
+          },
+          "direct_preference": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5833,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 60.46
+          },
+          "governance_update_noise": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.4826,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 39.81
+          },
+          "knowledge_update": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5469,
+            "distractor_leak@10": 0.5208,
+            "avg_returned": 36.96
+          },
+          "multi_session": {
+            "queries": 48,
+            "recall@20": 0.9583,
+            "recall@100": 1.0,
+            "mrr": 0.5587,
+            "distractor_leak@10": null,
+            "avg_returned": 45.29
+          },
+          "single_hop": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.4391,
+            "distractor_leak@10": null,
+            "avg_returned": 90.31
+          },
+          "temporal": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.6285,
+            "distractor_leak@10": 0.5,
+            "avg_returned": 99.62
+          }
+        },
+        "by_difficulty": {
+          "paraphrase": {
+            "queries": 144,
+            "recall@20": 0.9861,
+            "recall@100": 1.0,
+            "mrr": 0.3544,
+            "distractor_leak@10": 0.5208,
+            "avg_returned": 63.4
+          },
+          "plain": {
+            "queries": 144,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.7253,
+            "distractor_leak@10": 0.9896,
+            "avg_returned": 60.76
+          }
+        },
+        "by_kind_difficulty": {
+          "direct_preference|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 60.33
+          },
+          "direct_preference|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.6667,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 60.58
+          },
+          "governance_update_noise|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.4653,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 38.83
+          },
+          "governance_update_noise|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 40.79
+          },
+          "knowledge_update|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.2036,
+            "distractor_leak@10": 0.0833,
+            "avg_returned": 31.96
+          },
+          "knowledge_update|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.8902,
+            "distractor_leak@10": 0.9583,
+            "avg_returned": 41.96
+          },
+          "multi_session|paraphrase": {
+            "queries": 24,
+            "recall@20": 0.9167,
+            "recall@100": 1.0,
+            "mrr": 0.1174,
+            "distractor_leak@10": null,
+            "avg_returned": 49.25
+          },
+          "multi_session|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": null,
+            "avg_returned": 41.33
+          },
+          "single_hop|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5833,
+            "distractor_leak@10": null,
+            "avg_returned": 100.0
+          },
+          "single_hop|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.2948,
+            "distractor_leak@10": null,
+            "avg_returned": 80.62
+          },
+          "temporal|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.2569,
+            "distractor_leak@10": 0.0,
+            "avg_returned": 100.0
+          },
+          "temporal|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 99.25
+          }
+        },
+        "latency": {
+          "count": 336,
+          "mean_ms": 14.005,
+          "p50_ms": 14.584,
+          "p95_ms": 21.719,
+          "p99_ms": 26.271,
+          "max_ms": 40.65
+        },
+        "seed": 20260806
+      },
+      {
+        "stage": "L10_preference_ctrl",
+        "flags": {
+          "views": true,
+          "exact": true,
+          "datenum": true,
+          "entity": true,
+          "rerank": true,
+          "temporal_intent": false,
+          "rrf": true,
+          "dedup": true,
+          "use_options": true,
+          "exact_scan": false,
+          "vector": false,
+          "supersession": true,
+          "supersession_update_guard": true,
+          "preference_role_boost": true
+        },
+        "skipped": false,
+        "skip_reason": "",
+        "index": {
+          "add_calls": 336,
+          "messages": 5568,
+          "elapsed_s": 5.735,
+          "messages_per_s": 970.9,
+          "rows": {
+            "messages": 5568,
+            "views": 3264,
+            "users": 48,
+            "sessions": 192
+          }
+        },
+        "overall": {
+          "queries": 288,
+          "recall@20": 0.9931,
+          "recall@100": 1.0,
+          "mrr": 0.6093,
+          "distractor_leak@10": 0.7552,
+          "avg_returned": 62.08
+        },
+        "by_kind": {
+          "absent": {
+            "queries": 48,
+            "note": "gold 为空，不计入 Recall/MRR",
+            "avg_returned": 100.0
+          },
+          "direct_preference": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 60.46
+          },
+          "governance_update_noise": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.4826,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 39.81
+          },
+          "knowledge_update": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5469,
+            "distractor_leak@10": 0.5208,
+            "avg_returned": 36.96
+          },
+          "multi_session": {
+            "queries": 48,
+            "recall@20": 0.9583,
+            "recall@100": 1.0,
+            "mrr": 0.5587,
+            "distractor_leak@10": null,
+            "avg_returned": 45.29
+          },
+          "single_hop": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.4391,
+            "distractor_leak@10": null,
+            "avg_returned": 90.31
+          },
+          "temporal": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.6285,
+            "distractor_leak@10": 0.5,
+            "avg_returned": 99.62
+          }
+        },
+        "by_difficulty": {
+          "paraphrase": {
+            "queries": 144,
+            "recall@20": 0.9861,
+            "recall@100": 1.0,
+            "mrr": 0.4378,
+            "distractor_leak@10": 0.5208,
+            "avg_returned": 63.4
+          },
+          "plain": {
+            "queries": 144,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.7808,
+            "distractor_leak@10": 0.9896,
+            "avg_returned": 60.76
+          }
+        },
+        "by_kind_difficulty": {
+          "direct_preference|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 60.33
+          },
+          "direct_preference|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 60.58
+          },
+          "governance_update_noise|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.4653,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 38.83
+          },
+          "governance_update_noise|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 40.79
+          },
+          "knowledge_update|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.2036,
+            "distractor_leak@10": 0.0833,
+            "avg_returned": 31.96
+          },
+          "knowledge_update|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.8902,
+            "distractor_leak@10": 0.9583,
+            "avg_returned": 41.96
+          },
+          "multi_session|paraphrase": {
+            "queries": 24,
+            "recall@20": 0.9167,
+            "recall@100": 1.0,
+            "mrr": 0.1174,
+            "distractor_leak@10": null,
+            "avg_returned": 49.25
+          },
+          "multi_session|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": null,
+            "avg_returned": 41.33
+          },
+          "single_hop|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5833,
+            "distractor_leak@10": null,
+            "avg_returned": 100.0
+          },
+          "single_hop|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.2948,
+            "distractor_leak@10": null,
+            "avg_returned": 80.62
+          },
+          "temporal|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.2569,
+            "distractor_leak@10": 0.0,
+            "avg_returned": 100.0
+          },
+          "temporal|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 99.25
+          }
+        },
+        "latency": {
+          "count": 336,
+          "mean_ms": 13.692,
+          "p50_ms": 14.543,
+          "p95_ms": 21.574,
+          "p99_ms": 22.755,
+          "max_ms": 42.868
+        },
+        "seed": 20260806
+      }
+    ],
+    [
+      {
+        "stage": "L5_plus_weighted_rrf",
+        "flags": {
+          "views": true,
+          "exact": true,
+          "datenum": true,
+          "entity": true,
+          "rerank": true,
+          "temporal_intent": false,
+          "rrf": true,
+          "dedup": true,
+          "use_options": true,
+          "exact_scan": false,
+          "vector": false,
+          "supersession": false,
+          "supersession_update_guard": false,
+          "preference_role_boost": false
+        },
+        "skipped": false,
+        "skip_reason": "",
+        "index": {
+          "add_calls": 336,
+          "messages": 5568,
+          "elapsed_s": 5.78,
+          "messages_per_s": 963.3,
+          "rows": {
+            "messages": 5568,
+            "views": 3264,
+            "users": 48,
+            "sessions": 192
+          }
+        },
+        "overall": {
+          "queries": 288,
+          "recall@20": 0.9896,
+          "recall@100": 1.0,
+          "mrr": 0.5624,
+          "distractor_leak@10": 0.75,
+          "avg_returned": 61.42
+        },
+        "by_kind": {
+          "absent": {
+            "queries": 48,
+            "note": "gold 为空，不计入 Recall/MRR",
+            "avg_returned": 100.0
+          },
+          "direct_preference": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5833,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 60.62
+          },
+          "governance_update_noise": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.4826,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 39.9
+          },
+          "knowledge_update": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5114,
+            "distractor_leak@10": 0.5,
+            "avg_returned": 35.62
+          },
+          "multi_session": {
+            "queries": 48,
+            "recall@20": 0.9583,
+            "recall@100": 1.0,
+            "mrr": 0.5665,
+            "distractor_leak@10": null,
+            "avg_returned": 44.88
+          },
+          "single_hop": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.7003,
+            "distractor_leak@10": null,
+            "avg_returned": 89.77
+          },
+          "temporal": {
+            "queries": 48,
+            "recall@20": 0.9792,
+            "recall@100": 1.0,
+            "mrr": 0.5303,
+            "distractor_leak@10": 0.5,
+            "avg_returned": 97.75
+          }
+        },
+        "by_difficulty": {
+          "paraphrase": {
+            "queries": 144,
+            "recall@20": 0.9792,
+            "recall@100": 1.0,
+            "mrr": 0.3895,
+            "distractor_leak@10": 0.5312,
+            "avg_returned": 64.27
+          },
+          "plain": {
+            "queries": 144,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.7354,
+            "distractor_leak@10": 0.9688,
+            "avg_returned": 58.58
+          }
+        },
+        "by_kind_difficulty": {
+          "direct_preference|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.6667,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 61.0
+          },
+          "direct_preference|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 60.25
+          },
+          "governance_update_noise|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 41.79
+          },
+          "governance_update_noise|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.4653,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 38.0
+          },
+          "knowledge_update|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.1433,
+            "distractor_leak@10": 0.125,
+            "avg_returned": 33.92
+          },
+          "knowledge_update|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.8795,
+            "distractor_leak@10": 0.875,
+            "avg_returned": 37.33
+          },
+          "multi_session|paraphrase": {
+            "queries": 24,
+            "recall@20": 0.9167,
+            "recall@100": 1.0,
+            "mrr": 0.133,
+            "distractor_leak@10": null,
+            "avg_returned": 48.92
+          },
+          "multi_session|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": null,
+            "avg_returned": 40.83
+          },
+          "single_hop|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.8333,
+            "distractor_leak@10": null,
+            "avg_returned": 100.0
+          },
+          "single_hop|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5674,
+            "distractor_leak@10": null,
+            "avg_returned": 79.54
+          },
+          "temporal|paraphrase": {
+            "queries": 24,
+            "recall@20": 0.9583,
+            "recall@100": 1.0,
+            "mrr": 0.0607,
+            "distractor_leak@10": 0.0,
+            "avg_returned": 100.0
+          },
+          "temporal|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 95.5
+          }
+        },
+        "latency": {
+          "count": 336,
+          "mean_ms": 12.941,
+          "p50_ms": 13.258,
+          "p95_ms": 21.192,
+          "p99_ms": 21.612,
+          "max_ms": 22.271
+        },
+        "seed": 20260807
+      },
+      {
+        "stage": "L9_guarded_supersession",
+        "flags": {
+          "views": true,
+          "exact": true,
+          "datenum": true,
+          "entity": true,
+          "rerank": true,
+          "temporal_intent": false,
+          "rrf": true,
+          "dedup": true,
+          "use_options": true,
+          "exact_scan": false,
+          "vector": false,
+          "supersession": true,
+          "supersession_update_guard": true,
+          "preference_role_boost": false
+        },
+        "skipped": false,
+        "skip_reason": "",
+        "index": {
+          "add_calls": 336,
+          "messages": 5568,
+          "elapsed_s": 5.912,
+          "messages_per_s": 941.8,
+          "rows": {
+            "messages": 5568,
+            "views": 3264,
+            "users": 48,
+            "sessions": 192
+          }
+        },
+        "overall": {
+          "queries": 288,
+          "recall@20": 0.9931,
+          "recall@100": 1.0,
+          "mrr": 0.5787,
+          "distractor_leak@10": 0.75,
+          "avg_returned": 61.42
+        },
+        "by_kind": {
+          "absent": {
+            "queries": 48,
+            "note": "gold 为空，不计入 Recall/MRR",
+            "avg_returned": 100.0
+          },
+          "direct_preference": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5833,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 60.62
+          },
+          "governance_update_noise": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.4826,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 39.9
+          },
+          "knowledge_update": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5042,
+            "distractor_leak@10": 0.5,
+            "avg_returned": 35.62
+          },
+          "multi_session": {
+            "queries": 48,
+            "recall@20": 0.9583,
+            "recall@100": 1.0,
+            "mrr": 0.5665,
+            "distractor_leak@10": null,
+            "avg_returned": 44.88
+          },
+          "single_hop": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.7003,
+            "distractor_leak@10": null,
+            "avg_returned": 89.77
+          },
+          "temporal": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.6354,
+            "distractor_leak@10": 0.5,
+            "avg_returned": 97.75
+          }
+        },
+        "by_difficulty": {
+          "paraphrase": {
+            "queries": 144,
+            "recall@20": 0.9861,
+            "recall@100": 1.0,
+            "mrr": 0.4221,
+            "distractor_leak@10": 0.5312,
+            "avg_returned": 64.27
+          },
+          "plain": {
+            "queries": 144,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.7354,
+            "distractor_leak@10": 0.9688,
+            "avg_returned": 58.58
+          }
+        },
+        "by_kind_difficulty": {
+          "direct_preference|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.6667,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 61.0
+          },
+          "direct_preference|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 60.25
+          },
+          "governance_update_noise|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 41.79
+          },
+          "governance_update_noise|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.4653,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 38.0
+          },
+          "knowledge_update|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.1289,
+            "distractor_leak@10": 0.125,
+            "avg_returned": 33.92
+          },
+          "knowledge_update|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.8795,
+            "distractor_leak@10": 0.875,
+            "avg_returned": 37.33
+          },
+          "multi_session|paraphrase": {
+            "queries": 24,
+            "recall@20": 0.9167,
+            "recall@100": 1.0,
+            "mrr": 0.133,
+            "distractor_leak@10": null,
+            "avg_returned": 48.92
+          },
+          "multi_session|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": null,
+            "avg_returned": 40.83
+          },
+          "single_hop|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.8333,
+            "distractor_leak@10": null,
+            "avg_returned": 100.0
+          },
+          "single_hop|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5674,
+            "distractor_leak@10": null,
+            "avg_returned": 79.54
+          },
+          "temporal|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.2708,
+            "distractor_leak@10": 0.0,
+            "avg_returned": 100.0
+          },
+          "temporal|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 95.5
+          }
+        },
+        "latency": {
+          "count": 336,
+          "mean_ms": 13.551,
+          "p50_ms": 14.067,
+          "p95_ms": 21.31,
+          "p99_ms": 22.81,
+          "max_ms": 23.96
+        },
+        "seed": 20260807
+      },
+      {
+        "stage": "L10_preference_ctrl",
+        "flags": {
+          "views": true,
+          "exact": true,
+          "datenum": true,
+          "entity": true,
+          "rerank": true,
+          "temporal_intent": false,
+          "rrf": true,
+          "dedup": true,
+          "use_options": true,
+          "exact_scan": false,
+          "vector": false,
+          "supersession": true,
+          "supersession_update_guard": true,
+          "preference_role_boost": true
+        },
+        "skipped": false,
+        "skip_reason": "",
+        "index": {
+          "add_calls": 336,
+          "messages": 5568,
+          "elapsed_s": 5.883,
+          "messages_per_s": 946.5,
+          "rows": {
+            "messages": 5568,
+            "views": 3264,
+            "users": 48,
+            "sessions": 192
+          }
+        },
+        "overall": {
+          "queries": 288,
+          "recall@20": 0.9931,
+          "recall@100": 1.0,
+          "mrr": 0.6482,
+          "distractor_leak@10": 0.75,
+          "avg_returned": 61.42
+        },
+        "by_kind": {
+          "absent": {
+            "queries": 48,
+            "note": "gold 为空，不计入 Recall/MRR",
+            "avg_returned": 100.0
+          },
+          "direct_preference": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 60.62
+          },
+          "governance_update_noise": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.4826,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 39.9
+          },
+          "knowledge_update": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5042,
+            "distractor_leak@10": 0.5,
+            "avg_returned": 35.62
+          },
+          "multi_session": {
+            "queries": 48,
+            "recall@20": 0.9583,
+            "recall@100": 1.0,
+            "mrr": 0.5665,
+            "distractor_leak@10": null,
+            "avg_returned": 44.88
+          },
+          "single_hop": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.7003,
+            "distractor_leak@10": null,
+            "avg_returned": 89.77
+          },
+          "temporal": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.6354,
+            "distractor_leak@10": 0.5,
+            "avg_returned": 97.75
+          }
+        },
+        "by_difficulty": {
+          "paraphrase": {
+            "queries": 144,
+            "recall@20": 0.9861,
+            "recall@100": 1.0,
+            "mrr": 0.4777,
+            "distractor_leak@10": 0.5312,
+            "avg_returned": 64.27
+          },
+          "plain": {
+            "queries": 144,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.8187,
+            "distractor_leak@10": 0.9688,
+            "avg_returned": 58.58
+          }
+        },
+        "by_kind_difficulty": {
+          "direct_preference|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 61.0
+          },
+          "direct_preference|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 60.25
+          },
+          "governance_update_noise|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 41.79
+          },
+          "governance_update_noise|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.4653,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 38.0
+          },
+          "knowledge_update|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.1289,
+            "distractor_leak@10": 0.125,
+            "avg_returned": 33.92
+          },
+          "knowledge_update|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.8795,
+            "distractor_leak@10": 0.875,
+            "avg_returned": 37.33
+          },
+          "multi_session|paraphrase": {
+            "queries": 24,
+            "recall@20": 0.9167,
+            "recall@100": 1.0,
+            "mrr": 0.133,
+            "distractor_leak@10": null,
+            "avg_returned": 48.92
+          },
+          "multi_session|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": null,
+            "avg_returned": 40.83
+          },
+          "single_hop|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.8333,
+            "distractor_leak@10": null,
+            "avg_returned": 100.0
+          },
+          "single_hop|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5674,
+            "distractor_leak@10": null,
+            "avg_returned": 79.54
+          },
+          "temporal|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.2708,
+            "distractor_leak@10": 0.0,
+            "avg_returned": 100.0
+          },
+          "temporal|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 95.5
+          }
+        },
+        "latency": {
+          "count": 336,
+          "mean_ms": 13.428,
+          "p50_ms": 13.935,
+          "p95_ms": 21.364,
+          "p99_ms": 21.947,
+          "max_ms": 23.282
+        },
+        "seed": 20260807
+      }
+    ],
+    [
+      {
+        "stage": "L5_plus_weighted_rrf",
+        "flags": {
+          "views": true,
+          "exact": true,
+          "datenum": true,
+          "entity": true,
+          "rerank": true,
+          "temporal_intent": false,
+          "rrf": true,
+          "dedup": true,
+          "use_options": true,
+          "exact_scan": false,
+          "vector": false,
+          "supersession": false,
+          "supersession_update_guard": false,
+          "preference_role_boost": false
+        },
+        "skipped": false,
+        "skip_reason": "",
+        "index": {
+          "add_calls": 336,
+          "messages": 5568,
+          "elapsed_s": 5.741,
+          "messages_per_s": 969.9,
+          "rows": {
+            "messages": 5568,
+            "views": 3264,
+            "users": 48,
+            "sessions": 192
+          }
+        },
+        "overall": {
+          "queries": 288,
+          "recall@20": 0.9861,
+          "recall@100": 1.0,
+          "mrr": 0.5575,
+          "distractor_leak@10": 0.7396,
+          "avg_returned": 61.97
+        },
+        "by_kind": {
+          "absent": {
+            "queries": 48,
+            "note": "gold 为空，不计入 Recall/MRR",
+            "avg_returned": 100.0
+          },
+          "direct_preference": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5833,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 61.73
+          },
+          "governance_update_noise": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.4826,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 40.02
+          },
+          "knowledge_update": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5333,
+            "distractor_leak@10": 0.4583,
+            "avg_returned": 36.62
+          },
+          "multi_session": {
+            "queries": 48,
+            "recall@20": 0.9375,
+            "recall@100": 1.0,
+            "mrr": 0.5625,
+            "distractor_leak@10": null,
+            "avg_returned": 45.58
+          },
+          "single_hop": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.651,
+            "distractor_leak@10": null,
+            "avg_returned": 89.9
+          },
+          "temporal": {
+            "queries": 48,
+            "recall@20": 0.9792,
+            "recall@100": 1.0,
+            "mrr": 0.5324,
+            "distractor_leak@10": 0.5,
+            "avg_returned": 97.94
+          }
+        },
+        "by_difficulty": {
+          "paraphrase": {
+            "queries": 144,
+            "recall@20": 0.9722,
+            "recall@100": 1.0,
+            "mrr": 0.3233,
+            "distractor_leak@10": 0.5417,
+            "avg_returned": 63.9
+          },
+          "plain": {
+            "queries": 144,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.7918,
+            "distractor_leak@10": 0.9375,
+            "avg_returned": 60.03
+          }
+        },
+        "by_kind_difficulty": {
+          "direct_preference|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 62.38
+          },
+          "direct_preference|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.6667,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 61.08
+          },
+          "governance_update_noise|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.4653,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 39.58
+          },
+          "governance_update_noise|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 40.46
+          },
+          "knowledge_update|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.2011,
+            "distractor_leak@10": 0.1667,
+            "avg_returned": 33.46
+          },
+          "knowledge_update|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.8655,
+            "distractor_leak@10": 0.75,
+            "avg_returned": 39.79
+          },
+          "multi_session|paraphrase": {
+            "queries": 24,
+            "recall@20": 0.875,
+            "recall@100": 1.0,
+            "mrr": 0.1251,
+            "distractor_leak@10": null,
+            "avg_returned": 48.0
+          },
+          "multi_session|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": null,
+            "avg_returned": 43.17
+          },
+          "single_hop|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5833,
+            "distractor_leak@10": null,
+            "avg_returned": 100.0
+          },
+          "single_hop|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.7188,
+            "distractor_leak@10": null,
+            "avg_returned": 79.79
+          },
+          "temporal|paraphrase": {
+            "queries": 24,
+            "recall@20": 0.9583,
+            "recall@100": 1.0,
+            "mrr": 0.0648,
+            "distractor_leak@10": 0.0,
+            "avg_returned": 100.0
+          },
+          "temporal|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 95.88
+          }
+        },
+        "latency": {
+          "count": 336,
+          "mean_ms": 14.092,
+          "p50_ms": 14.459,
+          "p95_ms": 22.954,
+          "p99_ms": 23.573,
+          "max_ms": 24.643
+        },
+        "seed": 20260808
+      },
+      {
+        "stage": "L9_guarded_supersession",
+        "flags": {
+          "views": true,
+          "exact": true,
+          "datenum": true,
+          "entity": true,
+          "rerank": true,
+          "temporal_intent": false,
+          "rrf": true,
+          "dedup": true,
+          "use_options": true,
+          "exact_scan": false,
+          "vector": false,
+          "supersession": true,
+          "supersession_update_guard": true,
+          "preference_role_boost": false
+        },
+        "skipped": false,
+        "skip_reason": "",
+        "index": {
+          "add_calls": 336,
+          "messages": 5568,
+          "elapsed_s": 6.007,
+          "messages_per_s": 927.0,
+          "rows": {
+            "messages": 5568,
+            "views": 3264,
+            "users": 48,
+            "sessions": 192
+          }
+        },
+        "overall": {
+          "queries": 288,
+          "recall@20": 0.9896,
+          "recall@100": 1.0,
+          "mrr": 0.5749,
+          "distractor_leak@10": 0.7396,
+          "avg_returned": 61.97
+        },
+        "by_kind": {
+          "absent": {
+            "queries": 48,
+            "note": "gold 为空，不计入 Recall/MRR",
+            "avg_returned": 100.0
+          },
+          "direct_preference": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5833,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 61.73
+          },
+          "governance_update_noise": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.4826,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 40.02
+          },
+          "knowledge_update": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5329,
+            "distractor_leak@10": 0.4583,
+            "avg_returned": 36.62
+          },
+          "multi_session": {
+            "queries": 48,
+            "recall@20": 0.9375,
+            "recall@100": 1.0,
+            "mrr": 0.5625,
+            "distractor_leak@10": null,
+            "avg_returned": 45.58
+          },
+          "single_hop": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.651,
+            "distractor_leak@10": null,
+            "avg_returned": 89.9
+          },
+          "temporal": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.6372,
+            "distractor_leak@10": 0.5,
+            "avg_returned": 97.94
+          }
+        },
+        "by_difficulty": {
+          "paraphrase": {
+            "queries": 144,
+            "recall@20": 0.9792,
+            "recall@100": 1.0,
+            "mrr": 0.3581,
+            "distractor_leak@10": 0.5417,
+            "avg_returned": 63.9
+          },
+          "plain": {
+            "queries": 144,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.7918,
+            "distractor_leak@10": 0.9375,
+            "avg_returned": 60.03
+          }
+        },
+        "by_kind_difficulty": {
+          "direct_preference|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 62.38
+          },
+          "direct_preference|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.6667,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 61.08
+          },
+          "governance_update_noise|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.4653,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 39.58
+          },
+          "governance_update_noise|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 40.46
+          },
+          "knowledge_update|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.2004,
+            "distractor_leak@10": 0.1667,
+            "avg_returned": 33.46
+          },
+          "knowledge_update|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.8655,
+            "distractor_leak@10": 0.75,
+            "avg_returned": 39.79
+          },
+          "multi_session|paraphrase": {
+            "queries": 24,
+            "recall@20": 0.875,
+            "recall@100": 1.0,
+            "mrr": 0.1251,
+            "distractor_leak@10": null,
+            "avg_returned": 48.0
+          },
+          "multi_session|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": null,
+            "avg_returned": 43.17
+          },
+          "single_hop|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5833,
+            "distractor_leak@10": null,
+            "avg_returned": 100.0
+          },
+          "single_hop|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.7188,
+            "distractor_leak@10": null,
+            "avg_returned": 79.79
+          },
+          "temporal|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.2743,
+            "distractor_leak@10": 0.0,
+            "avg_returned": 100.0
+          },
+          "temporal|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 95.88
+          }
+        },
+        "latency": {
+          "count": 336,
+          "mean_ms": 14.47,
+          "p50_ms": 15.326,
+          "p95_ms": 22.991,
+          "p99_ms": 23.563,
+          "max_ms": 25.87
+        },
+        "seed": 20260808
+      },
+      {
+        "stage": "L10_preference_ctrl",
+        "flags": {
+          "views": true,
+          "exact": true,
+          "datenum": true,
+          "entity": true,
+          "rerank": true,
+          "temporal_intent": false,
+          "rrf": true,
+          "dedup": true,
+          "use_options": true,
+          "exact_scan": false,
+          "vector": false,
+          "supersession": true,
+          "supersession_update_guard": true,
+          "preference_role_boost": true
+        },
+        "skipped": false,
+        "skip_reason": "",
+        "index": {
+          "add_calls": 336,
+          "messages": 5568,
+          "elapsed_s": 5.792,
+          "messages_per_s": 961.3,
+          "rows": {
+            "messages": 5568,
+            "views": 3264,
+            "users": 48,
+            "sessions": 192
+          }
+        },
+        "overall": {
+          "queries": 288,
+          "recall@20": 0.9896,
+          "recall@100": 1.0,
+          "mrr": 0.6444,
+          "distractor_leak@10": 0.7396,
+          "avg_returned": 61.97
+        },
+        "by_kind": {
+          "absent": {
+            "queries": 48,
+            "note": "gold 为空，不计入 Recall/MRR",
+            "avg_returned": 100.0
+          },
+          "direct_preference": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 61.73
+          },
+          "governance_update_noise": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.4826,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 40.02
+          },
+          "knowledge_update": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5329,
+            "distractor_leak@10": 0.4583,
+            "avg_returned": 36.62
+          },
+          "multi_session": {
+            "queries": 48,
+            "recall@20": 0.9375,
+            "recall@100": 1.0,
+            "mrr": 0.5625,
+            "distractor_leak@10": null,
+            "avg_returned": 45.58
+          },
+          "single_hop": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.651,
+            "distractor_leak@10": null,
+            "avg_returned": 89.9
+          },
+          "temporal": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.6372,
+            "distractor_leak@10": 0.5,
+            "avg_returned": 97.94
+          }
+        },
+        "by_difficulty": {
+          "paraphrase": {
+            "queries": 144,
+            "recall@20": 0.9792,
+            "recall@100": 1.0,
+            "mrr": 0.4414,
+            "distractor_leak@10": 0.5417,
+            "avg_returned": 63.9
+          },
+          "plain": {
+            "queries": 144,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.8474,
+            "distractor_leak@10": 0.9375,
+            "avg_returned": 60.03
+          }
+        },
+        "by_kind_difficulty": {
+          "direct_preference|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 62.38
+          },
+          "direct_preference|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 61.08
+          },
+          "governance_update_noise|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.4653,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 39.58
+          },
+          "governance_update_noise|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 40.46
+          },
+          "knowledge_update|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.2004,
+            "distractor_leak@10": 0.1667,
+            "avg_returned": 33.46
+          },
+          "knowledge_update|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.8655,
+            "distractor_leak@10": 0.75,
+            "avg_returned": 39.79
+          },
+          "multi_session|paraphrase": {
+            "queries": 24,
+            "recall@20": 0.875,
+            "recall@100": 1.0,
+            "mrr": 0.1251,
+            "distractor_leak@10": null,
+            "avg_returned": 48.0
+          },
+          "multi_session|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": null,
+            "avg_returned": 43.17
+          },
+          "single_hop|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5833,
+            "distractor_leak@10": null,
+            "avg_returned": 100.0
+          },
+          "single_hop|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.7188,
+            "distractor_leak@10": null,
+            "avg_returned": 79.79
+          },
+          "temporal|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.2743,
+            "distractor_leak@10": 0.0,
+            "avg_returned": 100.0
+          },
+          "temporal|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 95.88
+          }
+        },
+        "latency": {
+          "count": 336,
+          "mean_ms": 14.692,
+          "p50_ms": 15.486,
+          "p95_ms": 23.319,
+          "p99_ms": 24.79,
+          "max_ms": 33.592
+        },
+        "seed": 20260808
+      }
+    ]
+  ],
+  "aggregate": [
+    {
+      "stage": "L5_plus_weighted_rrf",
+      "flags": {
+        "views": true,
+        "exact": true,
+        "datenum": true,
+        "entity": true,
+        "rerank": true,
+        "temporal_intent": false,
+        "rrf": true,
+        "dedup": true,
+        "use_options": true,
+        "exact_scan": false,
+        "vector": false,
+        "supersession": false,
+        "supersession_update_guard": false,
+        "preference_role_boost": false
+      },
+      "skipped": false,
+      "overall": {
+        "recall@20": {
+          "mean": 0.9769,
+          "min": 0.9549,
+          "max": 0.9896,
+          "n": 3
+        },
+        "recall@100": {
+          "mean": 1.0,
+          "min": 1.0,
+          "max": 1.0,
+          "n": 3
+        },
+        "mrr": {
+          "mean": 0.5477,
+          "min": 0.5233,
+          "max": 0.5624,
+          "n": 3
+        },
+        "distractor_leak@10": {
+          "mean": 0.7483,
+          "min": 0.7396,
+          "max": 0.7552,
+          "n": 3
+        },
+        "avg_returned": {
+          "mean": 61.8233,
+          "min": 61.42,
+          "max": 62.08,
+          "n": 3
+        }
+      },
+      "latency": {
+        "p50_ms": {
+          "mean": 13.6617,
+          "min": 13.258,
+          "max": 14.459,
+          "n": 3
+        },
+        "p95_ms": {
+          "mean": 21.7823,
+          "min": 21.192,
+          "max": 22.954,
+          "n": 3
+        },
+        "p99_ms": {
+          "mean": 22.3013,
+          "min": 21.612,
+          "max": 23.573,
+          "n": 3
+        },
+        "max_ms": {
+          "mean": 23.7353,
+          "min": 22.271,
+          "max": 24.643,
+          "n": 3
+        }
+      },
+      "by_kind_difficulty": {
+        "direct_preference|paraphrase": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.5556,
+            "min": 0.5,
+            "max": 0.6667,
+            "n": 3
+          },
+          "distractor_leak@10": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          }
+        },
+        "direct_preference|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.6111,
+            "min": 0.5,
+            "max": 0.6667,
+            "n": 3
+          },
+          "distractor_leak@10": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          }
+        },
+        "governance_update_noise|paraphrase": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.4769,
+            "min": 0.4653,
+            "max": 0.5,
+            "n": 3
+          },
+          "distractor_leak@10": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          }
+        },
+        "governance_update_noise|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.4884,
+            "min": 0.4653,
+            "max": 0.5,
+            "n": 3
+          },
+          "distractor_leak@10": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          }
+        },
+        "knowledge_update|paraphrase": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.1852,
+            "min": 0.1433,
+            "max": 0.2112,
+            "n": 3
+          },
+          "distractor_leak@10": {
+            "mean": 0.125,
+            "min": 0.0833,
+            "max": 0.1667,
+            "n": 3
+          }
+        },
+        "knowledge_update|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.8784,
+            "min": 0.8655,
+            "max": 0.8902,
+            "n": 3
+          },
+          "distractor_leak@10": {
+            "mean": 0.8611,
+            "min": 0.75,
+            "max": 0.9583,
+            "n": 3
+          }
+        },
+        "multi_session|paraphrase": {
+          "recall@20": {
+            "mean": 0.9028,
+            "min": 0.875,
+            "max": 0.9167,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.1252,
+            "min": 0.1174,
+            "max": 0.133,
+            "n": 3
+          },
+          "distractor_leak@10": null
+        },
+        "multi_session|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "distractor_leak@10": null
+        },
+        "single_hop|paraphrase": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.6666,
+            "min": 0.5833,
+            "max": 0.8333,
+            "n": 3
+          },
+          "distractor_leak@10": null
+        },
+        "single_hop|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.527,
+            "min": 0.2948,
+            "max": 0.7188,
+            "n": 3
+          },
+          "distractor_leak@10": null
+        },
+        "temporal|paraphrase": {
+          "recall@20": {
+            "mean": 0.8194,
+            "min": 0.5417,
+            "max": 0.9583,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.0588,
+            "min": 0.051,
+            "max": 0.0648,
+            "n": 3
+          },
+          "distractor_leak@10": {
+            "mean": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "n": 3
+          }
+        },
+        "temporal|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "distractor_leak@10": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          }
+        }
+      }
+    },
+    {
+      "stage": "L9_guarded_supersession",
+      "flags": {
+        "views": true,
+        "exact": true,
+        "datenum": true,
+        "entity": true,
+        "rerank": true,
+        "temporal_intent": false,
+        "rrf": true,
+        "dedup": true,
+        "use_options": true,
+        "exact_scan": false,
+        "vector": false,
+        "supersession": true,
+        "supersession_update_guard": true,
+        "preference_role_boost": false
+      },
+      "skipped": false,
+      "overall": {
+        "recall@20": {
+          "mean": 0.9919,
+          "min": 0.9896,
+          "max": 0.9931,
+          "n": 3
+        },
+        "recall@100": {
+          "mean": 1.0,
+          "min": 1.0,
+          "max": 1.0,
+          "n": 3
+        },
+        "mrr": {
+          "mean": 0.5645,
+          "min": 0.5399,
+          "max": 0.5787,
+          "n": 3
+        },
+        "distractor_leak@10": {
+          "mean": 0.7483,
+          "min": 0.7396,
+          "max": 0.7552,
+          "n": 3
+        },
+        "avg_returned": {
+          "mean": 61.8233,
+          "min": 61.42,
+          "max": 62.08,
+          "n": 3
+        }
+      },
+      "latency": {
+        "p50_ms": {
+          "mean": 14.659,
+          "min": 14.067,
+          "max": 15.326,
+          "n": 3
+        },
+        "p95_ms": {
+          "mean": 22.0067,
+          "min": 21.31,
+          "max": 22.991,
+          "n": 3
+        },
+        "p99_ms": {
+          "mean": 24.2147,
+          "min": 22.81,
+          "max": 26.271,
+          "n": 3
+        },
+        "max_ms": {
+          "mean": 30.16,
+          "min": 23.96,
+          "max": 40.65,
+          "n": 3
+        }
+      },
+      "by_kind_difficulty": {
+        "direct_preference|paraphrase": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.5556,
+            "min": 0.5,
+            "max": 0.6667,
+            "n": 3
+          },
+          "distractor_leak@10": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          }
+        },
+        "direct_preference|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.6111,
+            "min": 0.5,
+            "max": 0.6667,
+            "n": 3
+          },
+          "distractor_leak@10": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          }
+        },
+        "governance_update_noise|paraphrase": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.4769,
+            "min": 0.4653,
+            "max": 0.5,
+            "n": 3
+          },
+          "distractor_leak@10": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          }
+        },
+        "governance_update_noise|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.4884,
+            "min": 0.4653,
+            "max": 0.5,
+            "n": 3
+          },
+          "distractor_leak@10": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          }
+        },
+        "knowledge_update|paraphrase": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.1776,
+            "min": 0.1289,
+            "max": 0.2036,
+            "n": 3
+          },
+          "distractor_leak@10": {
+            "mean": 0.125,
+            "min": 0.0833,
+            "max": 0.1667,
+            "n": 3
+          }
+        },
+        "knowledge_update|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.8784,
+            "min": 0.8655,
+            "max": 0.8902,
+            "n": 3
+          },
+          "distractor_leak@10": {
+            "mean": 0.8611,
+            "min": 0.75,
+            "max": 0.9583,
+            "n": 3
+          }
+        },
+        "multi_session|paraphrase": {
+          "recall@20": {
+            "mean": 0.9028,
+            "min": 0.875,
+            "max": 0.9167,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.1252,
+            "min": 0.1174,
+            "max": 0.133,
+            "n": 3
+          },
+          "distractor_leak@10": null
+        },
+        "multi_session|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "distractor_leak@10": null
+        },
+        "single_hop|paraphrase": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.6666,
+            "min": 0.5833,
+            "max": 0.8333,
+            "n": 3
+          },
+          "distractor_leak@10": null
+        },
+        "single_hop|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.527,
+            "min": 0.2948,
+            "max": 0.7188,
+            "n": 3
+          },
+          "distractor_leak@10": null
+        },
+        "temporal|paraphrase": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.2673,
+            "min": 0.2569,
+            "max": 0.2743,
+            "n": 3
+          },
+          "distractor_leak@10": {
+            "mean": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "n": 3
+          }
+        },
+        "temporal|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "distractor_leak@10": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          }
+        }
+      }
+    },
+    {
+      "stage": "L10_preference_ctrl",
+      "flags": {
+        "views": true,
+        "exact": true,
+        "datenum": true,
+        "entity": true,
+        "rerank": true,
+        "temporal_intent": false,
+        "rrf": true,
+        "dedup": true,
+        "use_options": true,
+        "exact_scan": false,
+        "vector": false,
+        "supersession": true,
+        "supersession_update_guard": true,
+        "preference_role_boost": true
+      },
+      "skipped": false,
+      "overall": {
+        "recall@20": {
+          "mean": 0.9919,
+          "min": 0.9896,
+          "max": 0.9931,
+          "n": 3
+        },
+        "recall@100": {
+          "mean": 1.0,
+          "min": 1.0,
+          "max": 1.0,
+          "n": 3
+        },
+        "mrr": {
+          "mean": 0.634,
+          "min": 0.6093,
+          "max": 0.6482,
+          "n": 3
+        },
+        "distractor_leak@10": {
+          "mean": 0.7483,
+          "min": 0.7396,
+          "max": 0.7552,
+          "n": 3
+        },
+        "avg_returned": {
+          "mean": 61.8233,
+          "min": 61.42,
+          "max": 62.08,
+          "n": 3
+        }
+      },
+      "latency": {
+        "p50_ms": {
+          "mean": 14.6547,
+          "min": 13.935,
+          "max": 15.486,
+          "n": 3
+        },
+        "p95_ms": {
+          "mean": 22.0857,
+          "min": 21.364,
+          "max": 23.319,
+          "n": 3
+        },
+        "p99_ms": {
+          "mean": 23.164,
+          "min": 21.947,
+          "max": 24.79,
+          "n": 3
+        },
+        "max_ms": {
+          "mean": 33.2473,
+          "min": 23.282,
+          "max": 42.868,
+          "n": 3
+        }
+      },
+      "by_kind_difficulty": {
+        "direct_preference|paraphrase": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "distractor_leak@10": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          }
+        },
+        "direct_preference|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "distractor_leak@10": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          }
+        },
+        "governance_update_noise|paraphrase": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.4769,
+            "min": 0.4653,
+            "max": 0.5,
+            "n": 3
+          },
+          "distractor_leak@10": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          }
+        },
+        "governance_update_noise|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.4884,
+            "min": 0.4653,
+            "max": 0.5,
+            "n": 3
+          },
+          "distractor_leak@10": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          }
+        },
+        "knowledge_update|paraphrase": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.1776,
+            "min": 0.1289,
+            "max": 0.2036,
+            "n": 3
+          },
+          "distractor_leak@10": {
+            "mean": 0.125,
+            "min": 0.0833,
+            "max": 0.1667,
+            "n": 3
+          }
+        },
+        "knowledge_update|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.8784,
+            "min": 0.8655,
+            "max": 0.8902,
+            "n": 3
+          },
+          "distractor_leak@10": {
+            "mean": 0.8611,
+            "min": 0.75,
+            "max": 0.9583,
+            "n": 3
+          }
+        },
+        "multi_session|paraphrase": {
+          "recall@20": {
+            "mean": 0.9028,
+            "min": 0.875,
+            "max": 0.9167,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.1252,
+            "min": 0.1174,
+            "max": 0.133,
+            "n": 3
+          },
+          "distractor_leak@10": null
+        },
+        "multi_session|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "distractor_leak@10": null
+        },
+        "single_hop|paraphrase": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.6666,
+            "min": 0.5833,
+            "max": 0.8333,
+            "n": 3
+          },
+          "distractor_leak@10": null
+        },
+        "single_hop|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.527,
+            "min": 0.2948,
+            "max": 0.7188,
+            "n": 3
+          },
+          "distractor_leak@10": null
+        },
+        "temporal|paraphrase": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 0.2673,
+            "min": 0.2569,
+            "max": 0.2743,
+            "n": 3
+          },
+          "distractor_leak@10": {
+            "mean": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "n": 3
+          }
+        },
+        "temporal|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "mrr": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          },
+          "distractor_leak@10": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 3
+          }
+        }
+      }
+    }
+  ],
+  "rendered_at": "2026-08-13T02:05:06+0800"
+}

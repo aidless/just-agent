@@ -10,7 +10,7 @@
     python3 scripts/check_submission_materials.py --run-tests   # 顺便跑单测并核对计数
 
 退出码：所有 REQUIRED 项通过则 0；任一 REQUIRED 缺失则 1。
-BLOCKED（需人工确认）项只作为提醒打印，不导致非零退出——
+MANUAL REVIEW（需人工确认）项只作为提醒打印，不导致非零退出——
 因为它们是「设计上不自动执行」的门，而非缺失。
 """
 from __future__ import annotations
@@ -22,6 +22,10 @@ import sys
 import unittest
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if REPO not in sys.path:
+    # 允许从任意工作目录执行本脚本；否则 --run-tests 时 sys.path 只含 scripts/，
+    # unittest 能发现测试文件却无法导入仓库根下的 aml_retriever 包。
+    sys.path.insert(0, REPO)
 
 # ---- 期望存在的产物 ----------------------------------------------------------
 REQUIRED_FILES = [
@@ -44,7 +48,7 @@ README_REQUIRED_SECTIONS = [
     "快速开始",
     "官方 Add",
     "证据状态表",
-    "未做的事",
+    "尚未做的外部动作",
     "并发、隐私与删除",
 ]
 
@@ -140,15 +144,15 @@ def main(argv=None) -> int:
               n > 0 and not (result.failures or result.errors),
               f"failures={len(result.failures)} errors={len(result.errors)}")
 
-    # 7) BLOCKED 提醒（非失败，仅提示人工确认）
-    print("\n--- 需人工确认（BLOCKED，非缺失）---")
-    blocked_items = [
-        "gpt-4o-mini 门控：官方当前 Full 清单明确要求 Add/Search 使用该模型；本实现无 LLM 路径，当前不能勾选（见 docs/SUBMISSION_READINESS.md §6）",
-        "外部动作（报名/Key/部署/正式评测/邮件/费用/联网下载/真实数据）均未由自动化执行，保留人工确认门（见 §5）",
+    # 7) 人工复核提醒（非失败，仅提示，不推定官方适用路径）
+    print("\n--- 需人工复核（MANUAL REVIEW，非缺失）---")
+    manual_review_items = [
+        "评测入口：Full 自助清单与代码托管复现路线分开核对；不满足的模型项不得勾选（见 docs/SUBMISSION_READINESS.md §6）",
+        "v1.1 外部动作（报名/Key/部署/正式复评/邮件/费用/联网下载/真实数据）均未由本轮开发执行，保留人工确认门（见 §5）",
         "官方契约抓取于 2026-08-06，提交前须人工复核官方页面最新口径",
     ]
-    for item in blocked_items:
-        print(f"  [BLOCKED] {item}")
+    for item in manual_review_items:
+        print(f"  [MANUAL REVIEW] {item}")
 
     # 汇总
     failed = [n for n, ok, _ in RESULTS if not ok]
@@ -159,7 +163,7 @@ def main(argv=None) -> int:
         for n in failed:
             print(f"  - {n}")
         return 1
-    print("所有 REQUIRED 项通过。BLOCKED 项请人工确认后再提交。")
+    print("所有 REQUIRED 项通过。MANUAL REVIEW 项请人工确认后再提交。")
     return 0
 
 

@@ -20,7 +20,7 @@ AML Retriever 只做两件事：**Add**（写入记忆）与 **Search**（返回
 
 | 项 | 值 |
 | --- | --- |
-| 版本 | `1.0.0`（`aml_retriever/__init__.py::__version__`；HTTP `Server` 头 `aml-retriever/1.0`） |
+| 版本 | `1.1.0`（`aml_retriever/__init__.py::__version__`；HTTP `Server` 头 `aml-retriever/1.1`） |
 | 仓库根 | `aml-retriever/`（本目录即服务根；部署时把整个目录作为服务根） |
 | 公开候选仓库 | `https://github.com/dlxeva/flowgrid-aml-retriever` |
 | 启动（脚本） | `./scripts/serve.sh`（默认 `127.0.0.1:8080`） |
@@ -47,7 +47,7 @@ AML Retriever 只做两件事：**Add**（写入记忆）与 **Search**（返回
 
 | 检查 | 结果 | 命令 / 依据 |
 | --- | --- | --- |
-| 单元与契约测试 | **142 项全绿** | `python3 -m unittest discover -s tests` |
+| 单元与契约测试 | **146 项全绿** | `python3 -m unittest discover -s tests` |
 | HTTP 官方契约 smoke | **31 项全绿** | `python3 scripts/smoke_api.py` |
 | CLI 端到端自检 | 通过 | `python3 -m aml_retriever.cli selfcheck` |
 | 合成评测可复现 | 通过 | `python3 scripts/run_eval.py --scale medium --difficulty mixed --seed 20260806 --top-k 100`（同 seed 同指标） |
@@ -83,16 +83,18 @@ AML Retriever 只做两件事：**Add**（写入记忆）与 **Search**（返回
 | `rrf_weight_lexical=0.1` 是 Pareto 安全点 | **observed（有规模边界）** | `docs/EVAL.md` 附录 A/C；**仅 medium 及以上成立**，small×paraphrase 上反降 0.10 |
 | `temporal_intent` 应关闭 | **observed** | `docs/EVAL.md` 附录 B（仅限本合成集） |
 | 跨 seed 稳定性（3 seed × 3 difficulty） | **observed** | `docs/EVAL.md` 附录 C（仅限本合成集） |
-| `supersession` 对 temporal×paraphrase 有增益 | **observed** | 附录 D：目标格 MRR +0.11，跨 3 seed 区间不重叠 |
-| `supersession` 不应默认启用 | **observed** | 附录 D：总 MRR 在 2 难度 × 3 seed 上一致 −0.03~−0.04，未过启用门槛 |
+| 无保护 `supersession` 不应默认启用 | **observed** | 同为 4/1 时一个 seed 的 Recall@20 回退，保留为 L8 安全对照；历史 18/6 负结果见附录 D |
+| 受保护 `supersession` 4/1 可作为 v1.1 默认 | **observed** | 附录 E：classic/mixed/3 seeds 上 Recall@20 与 L5 持平，MRR 0.6728 → 0.6948 |
+| 用户第一人称偏好软加权 | **observed（候选）** | 附录 E：v11 代理题有效，但覆盖面不足，默认关闭 |
 | 合成集难度分布与官方数据可比 | **inferred** | 未经验证的假设 |
 | 官方数据规模落在哪一档（small/medium/large） | **unknown** | 直接影响上面 RRF 结论是否适用 |
 | 向量检索能否带来增益 | **unknown** | 本机无可用依赖，规则禁止为此安装 |
-| 在官方数据 / 榜单上的真实表现 | **unknown** | 从未接触官方数据，无任何官方成绩 |
-| Dockerfile 能否构建成功 | **confirmed（本机）** | Docker Desktop 4.85.0 / Engine 29.6.2，构建、FTS5、142 tests、31/31 smoke、容器 health/Add/Search 均通过 |
-| 「Add/Search 须用 gpt-4o-mini」门控 | **blocked** | 官方当前 Full 评测清单明确要求；本实现没有 LLM 路径，不能勾选 |
+| v1.0 首期公开榜 | **observed（官方公开榜快照）** | `FlowGrid_AML_Retriever` 第 8，综合分 43.98；与 v1.1 本地实验分开陈述 |
+| v1.1 在官方数据 / 榜单上的真实表现 | **unknown** | 尚未提交官方复评，不能由本地 MRR 外推 |
+| Dockerfile 能否构建成功 | **confirmed（v1.1 本机）** | Engine 29.6.2：构建、FTS5、146 tests、31/31 smoke、默认 CMD 的 health/Add/Search 均通过 |
+| `gpt-4o-mini` Full 自助门控对代码托管路线的适用性 | **needs recheck** | 自助 Full 清单与代码托管复现入口分开；v1.1 提交前复核当期规则 |
 | 公开 GitHub 仓库 | **confirmed（候选仓库）** | `https://github.com/dlxeva/flowgrid-aml-retriever`；公开版本仍需用户确认作者、许可证和来源披露 |
-| 报名 / Eval Key / 部署 / 正式提交 | **blocked** | 保留人工确认门，本工程不自动执行 |
+| v1.1 报名 / Eval Key / 部署 / 正式复评 | **not executed** | 保留人工确认门，本轮开发不执行外部动作 |
 
 ---
 
@@ -118,14 +120,15 @@ AML Retriever 只做两件事：**Add**（写入记忆）与 **Search**（返回
 
 ---
 
-## 5. 未执行的外部动作（保留人工确认门）
+## 5. v1.1 未执行的外部动作（保留人工确认门）
 
 以下动作**本工程默认不执行**，均保留为人工确认门。理由不是"做不到"，而是"不应由自动化越权代行"：
 
 | 动作 | 状态 | 说明 |
 | --- | --- | --- |
 | Git 提交 / 推送 / 建公开仓库 | **已执行（候选仓库）** | 目标为 `dlxeva/flowgrid-aml-retriever`；后续版本变更仍需用户确认 |
-| 报名赛事 | **不执行** | 需人工在官方页面操作 |
+| v1.0 报名与首期评测 | **历史已完成** | 已有首期公开榜结果；不把该结果外推到 v1.1 |
+| v1.1 报名 / 复评 | **不执行** | 需人工在官方页面操作 |
 | 申请 / 填写 Eval Key、API Key | **不执行** | 凭据不应写入代码或日志 |
 | 部署到任何环境 | **不执行** | 仅本地可运行，部署由人工决定 |
 | 跑正式 / 官方评测 | **不执行** | 不接触官方数据，不消耗官方配额 |
@@ -136,18 +139,21 @@ AML Retriever 只做两件事：**Add**（写入记忆）与 **Search**（返回
 
 ---
 
-## 6. gpt-4o-mini 门控（BLOCKED）
+## 6. gpt-4o-mini 路径适用性（v1.1 提交前复核）
 
-官方当前[参赛说明](https://agentmemories.ai/rules)的 Full 评测清单明确写出：提交的记忆系统在 Add 和 Search 阶段都必须使用 `gpt-4o-mini`，平台会复现提交版本；复现分数出现实质差异时，榜单结果可能失效。
+官方当前[参赛说明](https://agentmemories.ai/rules)的 Full 自助评测清单写有 Add/Search 使用
+`gpt-4o-mini` 的确认项；同一页面另列代码托管 / 主办方复现路线。两条路径不能混写成一个统一门槛。
+v1.0 已获得首期公开榜结果，因此“整个项目因模型门控而无法参赛”的旧表述已经失效；
+但这也不自动证明 v1.1 可忽略当期要求。
 
-当前实现无法勾选该项：
+当前实现的事实边界：
 
 - 本实现**全程不调用任何 LLM**：Add 是确定性写入，Search 是确定性多视图混合检索 + 重排，
   不生成、不改写、不调用大模型。
 - 这意味着：无 token 费用、结果可逐项复现、不依赖外部推理服务可用性。
-- 该门控当前属于**已确认的提交阻塞**，不再按“规则是否存在”处理。
-- 可行路径只有两类：主办方书面确认存在适用于本项目的例外，或用户授权后补充真实的 `gpt-4o-mini` Add/Search 适配层，并承担 API Key、费用、延迟、复现和数据合规责任。
-- 在得到授权和真实凭据前，不添加占位调用、不伪造调用记录、不勾选 Full 评测合规项。
+- 若走 Full 自助路线，必须按页面当期清单逐项如实确认；不满足就不勾选。
+- 若走代码托管 / 主办方复现路线，先向主办方确认该路线的模型、凭据与数据处理要求。
+- 在得到明确口径和真实凭据前，不添加占位调用、不伪造调用记录、不声称 v1.1 已通过官方合规复核。
 
 > 本仓库没有任何代码路径会静默"假装"调用了 LLM。
 
@@ -206,10 +212,10 @@ AML Retriever 只做两件事：**Add**（写入记忆）与 **Search**（返回
 
 - [ ] 人工复核官方页面**最新**口径（本仓库契约抓取于 **2026-08-06**，可能已过时）
 - [ ] 运行 `python3 scripts/check_submission_materials.py` 全绿
-- [ ] 确认 **§6 gpt-4o-mini 门控**处置方案（主办方确认 / 补充可选 LLM 层 / 明确标注差异）
+- [ ] 确认 v1.1 采用的评测路径，并按该路径复核 **§6** 的模型与凭据要求
 - [ ] 确认仓库**不含**任何真实用户数据或赛事数据
 - [ ] 确认 **§5** 列出的报名、Key、部署和正式评测仍未执行
-- [ ] 确认 `README.md` 与本文档版本号一致（当前 `1.0.0`）
+- [ ] 确认 `README.md` 与本文档版本号一致（当前 `1.1.0`）
 - [ ] 填写 **§8** 原创性与来源披露模板（不得留空虚构）
 
 ---

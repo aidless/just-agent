@@ -1,31 +1,32 @@
 # Agent Memory Challenge 报名与提交操作手册
 
-状态：代码候选仓库已公开；本文只记录可复现步骤和人工确认门，不执行报名、申请 Key、部署或正式评测。
+状态：v1.0 候选仓库已公开并取得首期公开榜结果；本文现在用于 v1.1 复评准备，只记录可复现步骤和人工确认门，不执行新的报名、申请 Key、部署或正式评测。
 
-最后核对日期：2026-08-07
+最后核对日期：2026-08-13
 
 ## 1. 当前状态
 
 已完成的本地证据：
 
-- `python3 -m unittest discover -s tests`：142 tests，全部通过。
+- `python3 -m unittest discover -s tests`：146 tests，全部通过。
 - `python3 -m aml_retriever.cli selfcheck`：8/8 通过。
 - `python3 scripts/smoke_api.py`：31/31 通过。
 - `python3 scripts/check_submission_materials.py`：25/25 通过。
-- 评测指标全部来自合成或手写 fixture，不代表官方榜单成绩。
+- Docker v1.1 本机验证：Engine 29.6.2，镜像构建、FTS5、146 tests、31/31 smoke、默认 CMD 的 health/Add/Search 均通过。
+- v1.1 评测指标全部来自合成或手写 fixture，不代表官方榜单成绩。
+- v1.0 首期公开榜快照：`FlowGrid_AML_Retriever` 第 8，综合分 43.98；不得外推为 v1.1 成绩。
 
 仍需人工或环境确认：
 
-- Docker 镜像构建与容器内 API 验证。已在本机 Docker Desktop 4.85.0 / Engine 29.6.2 完成构建、FTS5、142 tests、31/31 smoke、容器 health/Add/Search 验证。
-- 官方 Full 评测清单要求 Add/Search 使用 `gpt-4o-mini`；当前零 LLM 实现因此处于提交阻塞。
+- 官方 Full 自助清单与代码托管复现路线的要求不同；v1.1 选择路线后需按当期规则复核。
 - 真实作者、许可证、第三方来源和原创性披露。
 - 报名、Eval Key、可访问部署和正式评测。
 
 ## 2. 先确认模型边界
 
-公开评测仓库披露的 `gpt-4o-mini` 属于平台 Answer 阶段。[官方当前参赛说明](https://agentmemories.ai/rules)又在 Full 清单中要求提交系统的 Add/Search 也使用 `gpt-4o-mini`。这两条要求分别影响平台流程和参赛资格，必须分开记录。
+公开评测仓库披露的 `gpt-4o-mini` 属于平台 Answer 阶段。[官方当前参赛说明](https://agentmemories.ai/rules)又在 Full 自助清单中列出提交系统 Add/Search 的模型确认项，并另列代码托管 / 主办方复现路线。这些要求分别影响平台回答、评测入口和复现方式，必须分开记录。
 
-本实现的 Add/Search 是确定性的零 LLM 路线，因此当前不能勾选 Full 评测中的模型合规项。可行路径只有主办方书面确认例外，或用户授权后补充真实的 `gpt-4o-mini` Add/Search 适配层。不要添加占位调用，也不要伪造调用记录。
+本实现的 Add/Search 是确定性的零 LLM 路线，因此不能在没有真实实现时勾选 Full 自助清单中的模型项。v1.0 已获得公开榜结果，说明“整个项目被完全阻塞”的旧判断不成立；v1.1 仍应先确认采用哪个评测入口，再按该入口如实准备。不要添加占位调用，也不要伪造调用记录。
 
 建议发送给主办方的英文问题：
 
@@ -38,16 +39,16 @@ If not, what exact Add/Search integration, credential, data-handling, and
 reproducibility requirements should we follow?
 ```
 
-收到答复后，人工把原文、日期和结论填入 `SUBMISSION_READINESS.md` §6。没有例外答复或真实适配层时，状态保持 `blocked`。
+收到答复后，人工把原文、日期和结论填入 `SUBMISSION_READINESS.md` §6；没有明确口径时保持 `needs recheck`，不自行推定合规。
 
 ## 3. Docker 验证
 
-Docker Desktop 应用已安装到 `/Users/hu/Applications/Docker.app`，人工接受条款后引擎已稳定运行。本机验证结果为 `confirmed`，目标评测环境仍需按相同清单复核。
+Docker Desktop 应用已安装到 `/Users/hu/Applications/Docker.app`，人工接受条款后引擎已稳定运行。v1.1 本机验证结果为 `confirmed`，目标评测环境仍需按相同清单复核。
 
 安装并启动 Docker Desktop 后，在项目目录执行：
 
 ```bash
-cd /Users/hu/WorkBuddy/2026-08-06-16-02-06/aml-retriever
+cd /path/to/flowgrid-aml-retriever
 
 docker version
 docker build -t aml-retriever:local .
@@ -62,9 +63,11 @@ docker run --rm aml-retriever:local \
   python scripts/smoke_api.py
 
 docker run --rm -d --name aml-retriever-local \
-  -p 18080:8080 aml-retriever:local
+  -p 127.0.0.1::8080 aml-retriever:local
 
-curl -fsS http://127.0.0.1:18080/health
+docker port aml-retriever-local 8080/tcp
+# 把上一行输出的随机宿主机端口填到这里，避免与现有本地服务撞端口
+curl -fsS http://127.0.0.1:<printed-port>/health
 
 docker stop aml-retriever-local
 ```
@@ -89,7 +92,7 @@ docker stop aml-retriever-local
 - API 入口说明：`POST /add`、`POST /search`、`GET /health`。
 - Docker 启动命令：见 `Dockerfile` 顶部和本文 §3。
 - 复现说明：见 `README.md`、`docs/API_CONTRACT.md`、`docs/EVAL.md`。
-- 证据边界：本地指标来自合成 fixture，没有官方数据、官方成绩或真实用户数据。
+- 证据边界：v1.1 本地指标来自合成 fixture；v1.0 公开榜第 8 / 43.98 是独立历史证据；仓库不含官方数据或真实用户数据。
 - 隐私承诺：评测数据只用于当前任务，任务结束后按赛事要求删除；项目不把赛事数据用于训练、分析或传播。
 
 需要用户本人填写或确认：
@@ -104,7 +107,7 @@ docker stop aml-retriever-local
 
 每一步都先保存页面截图或文字记录，再进入下一步：
 
-1. 打开[赛事页](https://agentmemories.ai/competition/)和[规则页](https://agentmemories.ai/rules)，确认当前截止时间、资格、赛道和模型门槛。
+1. 打开[赛事页](https://agentmemories.ai/competition/)和[规则页](https://agentmemories.ai/rules)，确认 v1.1 复评窗口、资格、赛道和所选入口的模型要求。
 2. 记录主办方对零 LLM Add/Search 的答复。
 3. 完成 Docker 验证，并把结果写入 `SUBMISSION_READINESS.md`。
 4. 用户确认作者、许可证、来源披露和公开仓库策略。

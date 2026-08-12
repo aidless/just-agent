@@ -15,6 +15,8 @@
 | `temporal` | 带时间限定的检索 | 时间窗内的消息 |
 | `knowledge_update` | 同一事实被覆写，要拿**新值** | 新值消息；旧值列为 distractor |
 | `absent` | 库里根本没有答案 | 空（不计 Recall/MRR，只看是否硬凑证据） |
+| `governance_update_noise` | 真更新之后出现更晚的说明性提及 | 真更新为 gold；旧值与说明性提及为 distractor（仅 `suite=v11`） |
+| `direct_preference` | 用户本人偏好 vs assistant 建议 / 第三人偏好 | 用户第一人称原始消息（仅 `suite=v11`） |
 
 > **边界声明**：这是**自造的**代理任务（proxy task），用来做**相对比较**（A 档 vs B 档）。
 > 它不能预测官方榜单绝对分数，也不等价于官方 LoCoMo 等数据集的难度分布。
@@ -44,12 +46,15 @@ python3 scripts/run_eval.py --scale medium --difficulty mixed --seed 20260806 --
 | `L2_plus_exact` | 精确子串 / 覆盖率 | 本合成集上与 L1 持平，**保留但标注为无独立收益** |
 | `L3_plus_context` | 实体/数字/日期 + 时间与邻接重排 | 收益最大的一档，且大幅降低旧值泄漏 |
 | `L4_plus_dedup` | 候选去重 | Recall@20 补到 1.0 |
-| `L5_plus_weighted_rrf` | 加权 RRF（**线上默认**） | 小幅正增益，无召回代价 |
-| `L6_temporal_intent_ctrl` | 时间意图放大（**对照组**） | 负增益，固化为关闭 |
+| `L5_plus_weighted_rrf` | 加权 RRF（v1.0 默认 / v1.1 直接基线） | 小幅正增益，无召回代价 |
+| `L6_temporal_intent_ctrl` | 时间意图放大（负对照） | 负增益，固化为关闭 |
 | `L7_plus_vector` | 可选向量 | 本机无可用依赖，**跳过（unknown）** |
+| `L8_supersession_ctrl` | 无保护成对覆写（4/1 安全对照） | 总 MRR 小涨但一个 seed 的 Recall@20 回退，不默认启用 |
+| **`L9_guarded_supersession`** | 显式更新保护 + 保守 4/1 权重 | **v1.1 默认**；见附录 E |
+| `L10_preference_ctrl` | 用户第一人称偏好证据软加权 | 代理集有效，但场景宽度不足，默认关闭 |
 
-最新产物：`eval_out/REPORT_medium_mixed.md`、`eval_out/REPORT_medium_plain.md`
-及同目录 `ablation_*.json` / `.csv`。
+v1.0 历史产物保留在 `eval_out/` 根目录；v1.1 产物写入 `eval_out/v1.1/`，
+避免用新版本覆盖首期参评证据。
 
 > `L2` 在本合成集上无独立增益是**已知事实而非笔误**：合成语料的词面重叠已被
 > `L1` 的视图聚合吃掉大部分。它在真实语料上是否有效属 `unknown`。
@@ -64,7 +69,8 @@ python3 scripts/run_scan.py --scan all --scale medium --difficulties plain,parap
 因此扫描点之间的差异只来自被扫描的那个参数，不含索引噪声。
 
 产物：`eval_out/scan_rrf_medium_20260806.json/.csv`、
-`eval_out/scan_temporal_medium_20260806.json/.csv`。
+`eval_out/scan_temporal_medium_20260806.json/.csv`；v1.1 的覆写扫描使用
+`--scan supersession`，并可用 `--suite classic|v11` 切换代理集。
 
 ### 附录 A — 加权 RRF 的词法权重（`rrf_weight_lexical`）
 
@@ -128,11 +134,11 @@ Recall@20 全部保持 1.0000。故默认取 0.1。
 
 | difficulty | 档位 | Recall@20 | MRR | 旧值泄漏@10 | p95 (ms) |
 | --- | --- | --- | --- | --- | --- |
-| plain | `L5`（线上默认） | 0.9974 (0.9922–1.0000) | 0.7776 (0.7613–0.7951) | 0.7986 | 16.84 |
-| paraphrase | `L5`（线上默认） | 0.9948 (0.9896–1.0000) | 0.5719 (0.5629–0.5841) | 0.1806 | 11.68 |
-| mixed | `L5`（线上默认） | 0.9948 (0.9870–1.0000) | 0.6728 (0.6631–0.6791) | 0.5035 | 14.37 |
+| plain | `L5`（v1.0 默认） | 0.9974 (0.9922–1.0000) | 0.7776 (0.7613–0.7951) | 0.7986 | 16.84 |
+| paraphrase | `L5`（v1.0 默认） | 0.9948 (0.9896–1.0000) | 0.5719 (0.5629–0.5841) | 0.1806 | 11.68 |
+| mixed | `L5`（v1.0 默认） | 0.9948 (0.9870–1.0000) | 0.6728 (0.6631–0.6791) | 0.5035 | 14.37 |
 
-**结论**：线上默认档位的 Recall@20 在 3 个难度 × 3 个 seed 上都 ≥0.9870，
+**v1.0 结论**：当时线上默认档位的 Recall@20 在 3 个难度 × 3 个 seed 上都 ≥0.9870，
 MRR 的跨 seed 波动带宽 ≤0.034，说明主结论不是单 seed 偶然。
 逐 seed 原始数字见 `eval_out/ablation_*_multiseed_per_seed.csv`。
 
@@ -141,13 +147,13 @@ MRR 的跨 seed 波动带宽 ≤0.034，说明主结论不是单 seed 偶然。
 > **反而掉 0.10**（0.7719 → 0.6710）。即「`rrf_weight_lexical=0.1` 是 Pareto 安全点」
 > 这一结论**只在 medium 及以上规模成立**，不能外推到小规模。官方数据规模未知 → 属 `unknown`。
 
-### 附录 D — 覆写检测（`supersession`，候选，默认关闭）
+### 附录 D — v1.0 无保护覆写检测（历史 18/6 负对照）
 
 针对附录 B 暴露的 `temporal × paraphrase` 短板做的**零依赖**尝试：检测同一用户内
 「同话题的旧值 → 新值」成对覆写（结构性内容冗余 + 时间戳先后），局部抬高新值、轻降旧值。
 仅在查询含时间意图时触发（否则会误伤模板化的近重复干扰项）。
 
-`medium` / 3 seed，L5（默认）vs L8（开启 supersession）：
+`medium` / 3 seed，L5（默认）vs 当时使用 18/6 权重的 L8（开启 supersession）：
 
 | difficulty | 指标 | L5 默认 | L8 候选 | 差值 |
 | --- | --- | --- | --- | --- |
@@ -162,21 +168,60 @@ MRR 的跨 seed 波动带宽 ≤0.034，说明主结论不是单 seed 偶然。
 
 目标格 Recall@20 在两种难度下都是 1.0000 → 1.0000，无回退。
 
-**结论：不默认启用。** 目标格上的增益是真实且跨 seed 稳定的（3 个 seed 的取值区间
+**历史结论：不默认启用无保护版本。** 目标格上的增益是真实且跨 seed 稳定的（3 个 seed 的取值区间
 与 L5 完全不重叠，paraphrase 上 0.191–0.215 vs 0.077–0.102），泄漏也变好；
 但**整体 MRR 在 2 个难度 × 3 个 seed 上一致下降**，未满足
 「不引入 R@20 回退 **且** 多数 seed 上总 MRR 上升」的启用门槛，
-故固化为 `DEFAULT_FLAGS["supersession"] = False`，仅保留为可消融档位 `L8_supersession_ctrl`。
+故 v1.0 固化为 `DEFAULT_FLAGS["supersession"] = False`。v1.1 没有推翻“无保护版本不可默认”的结论：
+当前 `L8_supersession_ctrl` 用保守 4/1 权重作为安全对照，默认启用的是附录 E 的**受保护组合**。
 
 失败根因（已定位，不做 fixture 特调）：整体 MRR 的损失集中在 `knowledge_update` 类。
 语料中存在「同一项目在更晚时间点的另一条无关提及」，纯时间戳先后会把这条无关的更晚消息
 误判为对 gold 的覆写并抬上去。要区分它们只能依赖显式更新措辞（"最新口径/已上调/作废"），
-那属于对合成 fixture 的过拟合，不做。
+当时没有通用保护与独立代理集，故未启用；v1.1 的后续处理见附录 E。
 
 > 也试过用 IDF 加权的内容包含度来降低模板共有词的影响，实测**更差**
 > （目标格增益从 +0.11 掉到 +0.06，且 `knowledge_update` 的损失没有改善），已回退。
 >
 > 以上全部是**纯合成数据上的观测（observed）**。在官方数据上是否同号、量级如何，属 `unknown`。
+
+### 附录 E — v1.1 显式更新保护与偏好来源实验
+
+v1.1 将两个问题拆开评测：
+
+1. `L9_guarded_supersession`：较新消息除话题重合与时间更晚外，还必须带通用更新语义；
+   数值/日期更新不会干扰不询问数值状态的查询。仍只做软重排，旧证据完整保留。
+2. `L10_preference_ctrl`：只在偏好类查询中，软加权 `role=user` 且为第一人称的直接偏好陈述；
+   assistant 建议和第三人偏好不删除、不屏蔽。
+
+`classic` / medium / mixed / seeds 20260806–20260808 / top_k=100：
+
+| 档位 | Recall@20 mean (min–max) | Recall@100 | MRR mean (min–max) | temporal MRR | knowledge_update MRR |
+| --- | --- | --- | --- | --- | --- |
+| `L5` v1.0 基线 | 0.9948 (0.9870–1.0000) | 1.0000 | 0.6728 (0.6631–0.6791) | 0.5464 | 0.9017 |
+| `L8` 无保护 4/1 对照 | 0.9939 (0.9844–1.0000) | 1.0000 | 0.6780 (0.6680–0.6834) | 0.5891 | 0.8869 |
+| **`L9` 受保护 4/1** | **0.9948 (0.9870–1.0000)** | **1.0000** | **0.6948 (0.6854–0.7004)** | **0.6343** | **0.9017** |
+
+参数扫描还显示：`14/4` 与 `18/6` 可把 MRR 进一步抬到 0.7040，但 Recall@20
+在一个 seed 上从 0.9870 降到 0.9844。v1.1 选择 `4/1`，因为它是三个 seed 上
+**MRR 全部提升且 Recall@20 完全不退**的保守点；不为多拿约 0.009 MRR 交换召回。
+逐 seed 原始扫描见
+`eval_out/v1.1/scan_supersession_medium_{20260806,20260807,20260808}.json`
+（同名 CSV 便于表格分析）。
+
+`v11` 代理集是在 classic 基础上每用户追加两类合成题。三 seed 聚合中：
+
+- L9 相比 L5：总体 MRR 0.5477 → 0.5645，Recall@100 保持 1.0000；
+- L10（在 L9 上再开偏好加权）：总体 MRR 0.5645 → 0.6340；
+- `direct_preference` MRR 从 0.5834 升到 1.0000；
+- 保守 4/1 权重尚未改善 `governance_update_noise` 的首位排序（0.4827 持平），
+  更大权重虽能改善，但会触发上面的 Recall@20 代价。
+
+因此只将 L9 升为 v1.1 默认。L10 保持默认关闭：它证明了“用户本人直接证据”这一方向
+值得继续，但当前代理题仍由规则设计者构造，尚不足以证明对更广泛表达、引用转述和偏好变更都安全。
+
+> 以上仍然只是**本地合成代理证据**。v1.0 的官方公开榜成绩与 v1.1 本地消融必须分开陈述；
+> v1.1 尚未提交官方复评，也不能用这里的 MRR 推算官方综合分。
 
 ## 5. 向量分支（`vector`）
 
@@ -195,6 +240,9 @@ python3 scripts/smoke_api.py                     # HTTP 契约 smoke（自起临
 python3 scripts/run_eval.py  --scale medium --difficulty mixed  --seed 20260806 --top-k 100
 python3 scripts/run_eval.py  --scale medium --difficulty plain  --seed 20260806 --top-k 100
 python3 scripts/run_scan.py  --scan all --scale medium --difficulties plain,paraphrase,mixed
+python3 scripts/run_scan.py  --scan supersession --scale medium --suite classic --difficulties mixed
+python3 scripts/run_eval.py  --scale medium --difficulty mixed --suite v11 \
+    --seeds 20260806,20260807,20260808 --top-k 100
 
 # 跨 seed 稳定性（附录 C / D 的数字来源），每条约 5 分钟
 for d in plain paraphrase mixed; do

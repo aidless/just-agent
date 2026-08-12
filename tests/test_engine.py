@@ -196,12 +196,33 @@ class TestTemporalRanking(EngineCase):
             db.close()
 
     def test_temporal_intent_detection(self):
-        from aml_retriever.features import has_temporal_intent
+        from aml_retriever.features import (
+            has_direct_preference_statement,
+            has_date_value_intent,
+            has_preference_intent,
+            has_numeric_value_intent,
+            has_temporal_intent,
+            has_update_cue,
+        )
         self.assertTrue(has_temporal_intent("他现在早餐吃什么？"))
         self.assertTrue(has_temporal_intent("What is the latest budget?"))
         self.assertTrue(has_temporal_intent("最近一顿怎么解决的"))
         self.assertFalse(has_temporal_intent("他的工位编号是多少？"))
         self.assertFalse(has_temporal_intent(""))
+        self.assertTrue(has_update_cue("预算已更新为 9000 元，旧口径作废。"))
+        self.assertTrue(has_update_cue("The budget changed to 9000 and is now effective."))
+        self.assertFalse(has_update_cue("预算说明已经整理进手册。"))
+        self.assertFalse(has_update_cue("旧的预算说明已经归档。"))
+        self.assertTrue(has_preference_intent("我做抽检时偏好什么工具？"))
+        self.assertTrue(has_direct_preference_statement("我更喜欢用潮汐板做样本抽检。"))
+        self.assertTrue(has_direct_preference_statement("My go-to editor is Palewind."))
+        self.assertFalse(has_direct_preference_statement("林岚更喜欢潮汐板。"))
+        self.assertTrue(has_numeric_value_intent("当前预算是多少？"))
+        self.assertTrue(has_numeric_value_intent("What is the current version?"))
+        self.assertFalse(has_numeric_value_intent("猎户座现在由谁负责？"))
+        self.assertTrue(has_date_value_intent("发布日期是什么时候？"))
+        self.assertTrue(has_date_value_intent("What is the release date?"))
+        self.assertFalse(has_date_value_intent("猎户座现在由谁负责？"))
 
     def test_temporal_intent_flag_is_off_by_default(self):
         """默认关闭有离线证据支撑，改动默认值必须先更新 docs/EVAL.md。"""
@@ -211,6 +232,91 @@ class TestTemporalRanking(EngineCase):
         # 0.1 是扫描出的 Pareto 安全点（docs/EVAL.md 附录 A）。
         self.assertTrue(DEFAULT_FLAGS["rrf"])
         self.assertLessEqual(RetrieverConfig().rrf_weight_lexical, 0.25)
+        self.assertTrue(DEFAULT_FLAGS["supersession"])
+        self.assertTrue(DEFAULT_FLAGS["supersession_update_guard"])
+        self.assertFalse(DEFAULT_FLAGS["preference_role_boost"])
+
+    def test_update_guard_rejects_newer_non_update_noise(self):
+        cfg = RetrieverConfig(db_path=":memory:").with_flags(
+            views=False,
+            rrf=False,
+            dedup=False,
+            supersession=True,
+            supersession_update_guard=True,
+        )
+        db = RetrieverDB(cfg)
+        try:
+            db.add(request_id="guard", user_id="u1", session_id="s1", messages=[
+                {"role": "user", "content": "猎户座预算口径是 100 元。", "timestamp": 1_600_000_000_000},
+                {"role": "user", "content": "猎户座预算口径已更新为 200 元，旧的 100 元作废。", "timestamp": 1_600_000_060_000},
+                {"role": "user", "content": "猎户座预算口径说明已经整理完成。", "timestamp": 1_600_000_120_000},
+            ])
+            results = db.search(user_id="u1", query="猎户座目前的预算口径是多少？", top_k=20)
+            by_content = {e.content: e.evidence_flags for e in results.results if e.view == "message"}
+            update_flags = by_content["猎户座预算口径已更新为 200 元，旧的 100 元作废。"]
+            noise_flags = by_content["猎户座预算口径说明已经整理完成。"]
+            self.assertIn("supersedes_earlier", update_flags)
+            self.assertIn("explicit_update_cue", update_flags)
+            self.assertNotIn("supersedes_earlier", noise_flags)
+        finally:
+            db.close()
+
+    def test_preference_boost_only_marks_direct_user_statement(self):
+        cfg = RetrieverConfig(db_path=":memory:").with_flags(
+            views=False,
+            rrf=False,
+            dedup=False,
+            preference_role_boost=True,
+        )
+        db = RetrieverDB(cfg)
+        try:
+            db.add(request_id="preference", user_id="u1", session_id="s1", messages=[
+                {"role": "user", "content": "我更喜欢用潮汐板做样本抽检。", "timestamp": 1_600_000_000_000},
+                {"role": "assistant", "content": "你也许会喜欢用轴心面板做样本抽检。", "timestamp": 1_600_000_060_000},
+                {"role": "user", "content": "林岚更喜欢用 Grellet 做样本抽检。", "timestamp": 1_600_000_120_000},
+            ])
+            results = db.search(user_id="u1", query="我做样本抽检时更喜欢用什么工具？", top_k=20)
+            by_content = {e.content: e.evidence_flags for e in results.results if e.view == "message"}
+            self.assertIn("direct_user_preference", by_content["我更喜欢用潮汐板做样本抽检。"])
+            self.assertNotIn("direct_user_preference", by_content["你也许会喜欢用轴心面板做样本抽检。"])
+            self.assertNotIn("direct_user_preference", by_content["林岚更喜欢用 Grellet 做样本抽检。"])
+        finally:
+            db.close()
+
+    def test_update_guard_respects_structured_answer_type(self):
+        cfg = RetrieverConfig(db_path=":memory:").with_flags(
+            views=False,
+            rrf=False,
+            dedup=False,
+            supersession=True,
+            supersession_update_guard=True,
+        )
+        db = RetrieverDB(cfg)
+        try:
+            db.add(request_id="answer-type", user_id="u1", session_id="s1", messages=[
+                {"role": "user", "content": "猎户座预算是 100 元。", "timestamp": 1_600_000_000_000},
+                {"role": "user", "content": "猎户座预算已更新为 200 元。", "timestamp": 1_600_000_060_000},
+                {"role": "user", "content": "猎户座现在由林岚负责。", "timestamp": 1_600_000_120_000},
+                {"role": "user", "content": "北极星发布日期是 2026-08-14。", "timestamp": 1_600_000_180_000},
+                {"role": "user", "content": "北极星发布日期已更新为 2026-09-03，旧日期作废。", "timestamp": 1_600_000_240_000},
+            ])
+            results = db.search(user_id="u1", query="猎户座现在由谁负责？", top_k=20)
+            budget = next(
+                e for e in results.results
+                if e.view == "message" and "已更新为 200" in e.content
+            )
+            self.assertNotIn("supersedes_earlier", budget.evidence_flags)
+            date_results = db.search(
+                user_id="u1", query="北极星目前的发布日期是什么时候？", top_k=20
+            )
+            date_update = next(
+                e for e in date_results.results
+                if e.view == "message" and "已更新为 2026-09-03" in e.content
+            )
+            self.assertIn("supersedes_earlier", date_update.evidence_flags)
+            self.assertIn("explicit_update_cue", date_update.evidence_flags)
+        finally:
+            db.close()
 
 
 class TestAblationFlags(EngineCase):

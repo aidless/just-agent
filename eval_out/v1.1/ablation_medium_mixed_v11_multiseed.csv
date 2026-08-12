@@ -1,0 +1,4 @@
+stage,skipped,n_seeds,recall@20_mean,recall@20_min,recall@20_max,recall@100_mean,recall@100_min,recall@100_max,mrr_mean,mrr_min,mrr_max,distractor_leak@10_mean,distractor_leak@10_min,distractor_leak@10_max,p50_ms_mean,p50_ms_min,p50_ms_max,p95_ms_mean,p95_ms_min,p95_ms_max
+L5_plus_weighted_rrf,0,3,0.9769,0.9549,0.9896,1.0,1.0,1.0,0.5477,0.5233,0.5624,0.7483,0.7396,0.7552,13.6617,13.258,14.459,21.7823,21.192,22.954
+L9_guarded_supersession,0,3,0.9919,0.9896,0.9931,1.0,1.0,1.0,0.5645,0.5399,0.5787,0.7483,0.7396,0.7552,14.659,14.067,15.326,22.0067,21.31,22.991
+L10_preference_ctrl,0,3,0.9919,0.9896,0.9931,1.0,1.0,1.0,0.634,0.6093,0.6482,0.7483,0.7396,0.7552,14.6547,13.935,15.486,22.0857,21.364,23.319
