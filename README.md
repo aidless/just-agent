@@ -292,3 +292,7 @@ FlowGrid AML Retriever is an independent leaderboard implementation. It applies
 FlowGrid's ideas of provenance, temporal state, conflict preservation, and user
 isolation, but it is not the FlowGrid Core product and its leaderboard results
 should not be interpreted as validation of FlowGrid Core.
+
+## License
+
+Licensed under the [MIT License](LICENSE).

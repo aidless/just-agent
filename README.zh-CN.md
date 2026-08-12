@@ -255,3 +255,7 @@ config.example.json
 FlowGrid AML Retriever 是独立的排行榜实现。它吸收了 FlowGrid 的来源追踪、时间状态、
 冲突保留和用户隔离思想，但不是 FlowGrid Core 产品；排行榜成绩也不应被表述为
 FlowGrid Core 的产品验证。
+
+## 许可证
+
+本项目采用 [MIT License](LICENSE)。
