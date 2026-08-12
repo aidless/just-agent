@@ -1,0 +1,14 @@
+.git
+.gitignore
+.DS_Store
+.idea
+.vscode
+.venv
+venv
+__pycache__
+*.pyc
+*.db
+*.db-shm
+*.db-wal
+data
+eval_out

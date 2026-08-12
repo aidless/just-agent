@@ -1,13 +1,14 @@
-# 官方 Add / Search 接入规范（核对记录）
+# Add / Search API Contract
 
-来源（2026-08-06 抓取核对）：
+Reference sources checked on 2026-08-06:
 
 - 官方 API 指南：<https://agentmemories.ai/api-guide>（章节 `05 ADD / SEARCH CONTRACT`、`06 ERROR HANDLING`）
 - 官方公开评测代码：<https://github.com/AML-memory/agent-memory-leaderboard>（README「Disclosed production parameters」）
 - 官方赛事页：<https://agentmemories.ai/competition/>
 
-> 核对方式：页面为单页应用，Markdown 抓取会丢正文，需取原始 HTML 后转文本再定位章节。
-> 本文件记录的是**抓取到的官方原文要点**，实现严格按此对齐；报名/提交前仍须人工复核官方页面。
+This document records the published wire contract implemented by the repository.
+Upstream requirements can change, so integrations should compare it with the
+current official documentation before running a new evaluation.
 
 ## 1. 传输与地址
 
@@ -171,7 +172,6 @@
 | Full 任务超时 | 72 小时；检索 `top_k` = 100 |
 | Add | 默认 **64 global workers**、单数据集 48 记录硬上限、**20 条消息分块**、1200s HTTP 超时 |
 | Search | **32 workers**、1200s HTTP 超时、**6 次请求尝试**、最多 3 次失败记录重排、连续 5 次可重试 5xx 后自适应降并发 |
-| Answer | 32 workers、`gpt-4o-mini`、temperature 0、180s 超时 |
 | 评测页可配 | Max add concurrency 16–64、Search concurrency 16–256、Top K |
 
 ## 7. 数据与隐私义务（官方原文要点）
@@ -179,10 +179,3 @@
 - 评测数据及派生副本**只能用于完成当前任务**，不得用于模型训练、微调、产品分析、数据集重建或对外传播。
 - 仅向必要人员开放，**避免记录不必要的请求正文**，任务完成后 **30 天内删除**；延长保留需事先书面同意。
 - 禁止跨 `user_id` 返回记忆；`session_id` 只用于组织来源会话。
-
-## 8. 需人工确认的门（本工程不自动执行）
-
-1. **Full 评测门控清单**中有一项："Add/Search uses gpt-4o-mini —— 提交系统在 Add 与 Search 期间使用的模型必须是 gpt-4o-mini"。
-   本实现为**纯确定性词法/特征检索，Add 与 Search 全程不调用任何 LLM**。该项属于"是否满足"需主办方口径确认的人工门，本工程不声称已满足。
-2. 报名、Eval Key 申请、公开仓库、部署、Smoke / Full 提交，全部保留人工确认门。
-3. 提交截止（官方页面显示）：2026-08-07 23:59 UTC+8 —— 以官方页面实时口径为准。

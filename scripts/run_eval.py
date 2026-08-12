@@ -39,6 +39,8 @@ CSV_COLUMNS = [
     "p50_ms", "p95_ms", "p99_ms", "max_ms", "index_elapsed_s", "messages_per_s",
 ]
 
+PUBLIC_REPO = "flowgrid-aml-retriever"
+
 
 def environment() -> dict:
     available, reason = vector_backend_available()
@@ -418,6 +420,9 @@ def write_multiseed_artifacts(out_dir: str, payload: dict) -> list[str]:
     报告模板重新渲染历史 payload（改报告格式不该花 15 分钟重算指标）。
     返回写出的文件路径列表。
     """
+    # Reports are portable public artifacts; never serialize a checkout path.
+    payload["repo"] = PUBLIC_REPO
+
     scale, difficulty = payload["scale"], payload["difficulty"]
     suite = payload.get("suite", "classic")
     seeds = payload["seeds"]
@@ -545,7 +550,7 @@ def main(argv=None) -> int:
             per_seed_dict.append([{**r.to_dict(), "seed": seed} for r in ps])
         payload = {
             "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-            "repo": repo,
+            "repo": PUBLIC_REPO,
             "mode": "multiseed",
             "seeds": seeds,
             "scale": args.scale,
@@ -606,7 +611,7 @@ def main(argv=None) -> int:
 
     payload = {
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-        "repo": repo,
+        "repo": PUBLIC_REPO,
         "top_k": args.top_k,
         "wall_clock_s": round(time.time() - started, 2),
         "environment": environment(),

@@ -1,7 +1,10 @@
 # 离线评测方法与证据
 
-本文件是 `DEFAULT_FLAGS` 里每一个取值的**证据来源**。所有数字都由本仓库脚本在本机跑出，
-数据 100% 合成，可用同一 seed 复现。**没有任何官方赛事数据参与，也没有任何官方榜单成绩。**
+本文件记录 `DEFAULT_FLAGS` 主要取值的本地消融证据。所有数字都由仓库脚本使用
+100% 合成数据生成，可用同一 seed 复现；没有任何官方评测数据参与。
+
+v1.0 的官方公开成绩（43.98，第 8 名）是一次独立的排行榜结果。本文的合成指标只用于
+比较检索配置，不能与官方综合分换算，也不能替代新版本的官方评测。
 
 ## 1. 数据从哪来（以及它不是什么）
 
@@ -48,13 +51,13 @@ python3 scripts/run_eval.py --scale medium --difficulty mixed --seed 20260806 --
 | `L4_plus_dedup` | 候选去重 | Recall@20 补到 1.0 |
 | `L5_plus_weighted_rrf` | 加权 RRF（v1.0 默认 / v1.1 直接基线） | 小幅正增益，无召回代价 |
 | `L6_temporal_intent_ctrl` | 时间意图放大（负对照） | 负增益，固化为关闭 |
-| `L7_plus_vector` | 可选向量 | 本机无可用依赖，**跳过（unknown）** |
+| `L7_plus_vector` | 可选向量 | 依赖不可用时自动跳过（unknown） |
 | `L8_supersession_ctrl` | 无保护成对覆写（4/1 安全对照） | 总 MRR 小涨但一个 seed 的 Recall@20 回退，不默认启用 |
 | **`L9_guarded_supersession`** | 显式更新保护 + 保守 4/1 权重 | **v1.1 默认**；见附录 E |
 | `L10_preference_ctrl` | 用户第一人称偏好证据软加权 | 代理集有效，但场景宽度不足，默认关闭 |
 
-v1.0 历史产物保留在 `eval_out/` 根目录；v1.1 产物写入 `eval_out/v1.1/`，
-避免用新版本覆盖首期参评证据。
+评测产物默认写入已被 Git 忽略的 `eval_out/`。若需要长期保存不同版本的结果，建议为
+每次运行指定独立的 `--out` 目录，并记录版本或提交号。
 
 > `L2` 在本合成集上无独立增益是**已知事实而非笔误**：合成语料的词面重叠已被
 > `L1` 的视图聚合吃掉大部分。它在真实语料上是否有效属 `unknown`。
@@ -68,9 +71,8 @@ python3 scripts/run_scan.py --scan all --scale medium --difficulties plain,parap
 与主消融不同，扫描**共享同一索引**（全程 `views=True`），
 因此扫描点之间的差异只来自被扫描的那个参数，不含索引噪声。
 
-产物：`eval_out/scan_rrf_medium_20260806.json/.csv`、
-`eval_out/scan_temporal_medium_20260806.json/.csv`；v1.1 的覆写扫描使用
-`--scan supersession`，并可用 `--suite classic|v11` 切换代理集。
+产物生成到 `eval_out/`；v1.1 的覆写扫描使用 `--scan supersession`，并可用
+`--suite classic|v11` 切换代理集。
 
 ### 附录 A — 加权 RRF 的词法权重（`rrf_weight_lexical`）
 
@@ -124,8 +126,8 @@ Recall@20 全部保持 1.0000。故默认取 0.1。
 固化为 `temporal_intent = False`。
 
 > `paraphrase` 难度下 `temporal` 类 MRR 只有 0.077，是**本系统当前最弱的一环**：
-> 查询被改写后，纯词法 + 确定性特征几乎抓不到时间锚点。这正是向量检索最可能补上的地方，
-> 但本机无可用依赖，且规则禁止为此安装依赖 → 保留为 `unknown`。
+> 查询被改写后，纯词法 + 确定性特征几乎抓不到时间锚点。这正是向量检索最可能补上的地方；
+> 默认零依赖路径尚未验证该分支，因此保留为 `unknown`。
 
 ### 附录 C — 跨 seed 稳定性（3 seed）
 
@@ -140,7 +142,7 @@ Recall@20 全部保持 1.0000。故默认取 0.1。
 
 **v1.0 结论**：当时线上默认档位的 Recall@20 在 3 个难度 × 3 个 seed 上都 ≥0.9870，
 MRR 的跨 seed 波动带宽 ≤0.034，说明主结论不是单 seed 偶然。
-逐 seed 原始数字见 `eval_out/ablation_*_multiseed_per_seed.csv`。
+逐 seed 原始数字可由第 6 节命令生成到 `eval_out/*_per_seed.csv`。
 
 > **反例（必须如实记录）**：加权 RRF（L4→L5）在 `medium` 上是正收益
 > （plain +0.013、paraphrase +0.003、mixed +0.006），但在 `small` 规模的 `paraphrase` 上
@@ -205,9 +207,7 @@ v1.1 将两个问题拆开评测：
 参数扫描还显示：`14/4` 与 `18/6` 可把 MRR 进一步抬到 0.7040，但 Recall@20
 在一个 seed 上从 0.9870 降到 0.9844。v1.1 选择 `4/1`，因为它是三个 seed 上
 **MRR 全部提升且 Recall@20 完全不退**的保守点；不为多拿约 0.009 MRR 交换召回。
-逐 seed 原始扫描见
-`eval_out/v1.1/scan_supersession_medium_{20260806,20260807,20260808}.json`
-（同名 CSV 便于表格分析）。
+逐 seed 原始扫描可使用第 6 节命令生成 JSON 与同名 CSV。
 
 `v11` 代理集是在 classic 基础上每用户追加两类合成题。三 seed 聚合中：
 
@@ -226,10 +226,10 @@ v1.1 将两个问题拆开评测：
 ## 5. 向量分支（`vector`）
 
 `config.vector_backend_available()` 只**探测** `numpy` / `sentence_transformers` / `faiss`
-是否可导入，绝不安装、绝不联网下载模型。本机探测结果：**不可用**，
-故 `L7_plus_vector` 档位自动跳过，`DEFAULT_FLAGS["vector"] = False`。
+是否可导入，不安装依赖，也不下载模型。依赖不可用时，`L7_plus_vector` 自动跳过；
+`DEFAULT_FLAGS["vector"] = False`。
 
-该分支的收益在本环境中为 **unknown**——既未验证有效，也未验证无效。
+该可选分支没有进入默认配置，其收益仍为 **unknown**。
 
 ## 6. 复现清单
 
@@ -250,10 +250,8 @@ for d in plain paraphrase mixed; do
       --seeds 20260806,20260807,20260808 --top-k 100
 done
 
-# 只想换报告模板、不想重算指标时（秒级）
+# 只想换报告模板、不想重算指标时
 python3 scripts/run_eval.py --from-json eval_out/ablation_medium_paraphrase_multiseed.json
-
-python3 scripts/check_submission_materials.py     # 提交材料静态核对
 ```
 
 同一 seed 必然复现同一份数据与同一组指标（延迟数除外，受机器负载影响）。

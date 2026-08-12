@@ -501,6 +501,8 @@ class TestMultiseedReport(unittest.TestCase):
                               f"{os.path.basename(p)} 疑似夹带语料原文")
             self.assertNotIn("/T/aml-eval-", body,
                              f"{os.path.basename(p)} 泄漏了本机临时库路径")
+            self.assertNotIn("/tmp/repo", body,
+                             f"{os.path.basename(p)} 泄漏了 checkout 路径")
 
 
 if __name__ == "__main__":

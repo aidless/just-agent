@@ -1,7 +1,0 @@
-scan,difficulty,point,queries,recall@20,recall@100,mrr,distractor_leak@10,mrr_temporal,recall@20_temporal,p50_ms,p95_ms
-temporal,plain,temporal_intent_off,192,1.0,1.0,0.7613,0.7917,1.0,1.0,9.12,16.721
-temporal,plain,temporal_intent_on,192,1.0,1.0,0.7623,0.6354,1.0,1.0,9.78,17.213
-temporal,paraphrase,temporal_intent_off,192,1.0,1.0,0.5687,0.1667,0.0771,1.0,10.58,16.323
-temporal,paraphrase,temporal_intent_on,192,0.9896,1.0,0.5591,0.1562,0.0809,1.0,10.561,15.042
-temporal,mixed,temporal_intent_off,192,1.0,1.0,0.6631,0.5312,0.5392,1.0,10.259,16.649
-temporal,mixed,temporal_intent_on,192,0.9922,1.0,0.6561,0.3958,0.5407,1.0,9.976,15.532
