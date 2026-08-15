@@ -53,8 +53,9 @@ python3 scripts/run_eval.py --scale medium --difficulty mixed --seed 20260806 --
 | `L6_temporal_intent_ctrl` | 时间意图放大（负对照） | 负增益，固化为关闭 |
 | `L7_plus_vector` | 可选向量 | 依赖不可用时自动跳过（unknown） |
 | `L8_supersession_ctrl` | 无保护成对覆写（4/1 安全对照） | 总 MRR 小涨但一个 seed 的 Recall@20 回退，不默认启用 |
-| **`L9_guarded_supersession`** | 显式更新保护 + 保守 4/1 权重 | **v1.1 默认**；见附录 E |
+| `L9_guarded_supersession` | 显式更新保护 + 保守 4/1 权重 | v1.1 默认；见附录 E |
 | `L10_preference_ctrl` | 用户第一人称偏好证据软加权 | 代理集有效，但场景宽度不足，默认关闭 |
+| **`L11_v12_production`** | L9 + 时间兜底 + 内容时间戳前缀 | **v1.2 默认**（= `DEFAULT_FLAGS`）；见第 7 节 |
 
 评测产物默认写入已被 Git 忽略的 `eval_out/`。若需要长期保存不同版本的结果，建议为
 每次运行指定独立的 `--out` 目录，并记录版本或提交号。
@@ -258,3 +259,27 @@ python3 scripts/run_eval.py --from-json eval_out/ablation_medium_paraphrase_mult
 跨 seed 产物为 `eval_out/ablation_<scale>_<difficulty>_multiseed{,_per_seed}.csv`
 与 `REPORT_<scale>_<difficulty>_multiseed.md`；**产物只含指标数字，不落语料原文**，
 临时索引库在 `run_ladder_seeds` 的 `finally` 里 `shutil.rmtree` 清除。
+
+## 7. v1.2 变更（2026-08-15）
+
+v1.2 在 v1.1（L9）之上启用两个默认关闭过的开关，形成新生产档
+`L11_v12_production`（= `DEFAULT_FLAGS`）：
+
+| 开关 | 作用 | 三级证据 |
+|---|---|---|
+| `temporal_fallback` | ts_ms 缺失时按正文时间表达／会话锚点／created_at 逐层兜底，只影响排序 | 检索代理（locomo10 全量 1977 查询）：R@20 +0.006 / R@100 +0.004 / MRR +0.001；端到端 +0.0034 |
+| `content_timestamp_prefix` | 返回证据前加 `[<事件时间>]` 前缀（日级，不改原文不改排序），供答案模型在时间问题上使用 | 端到端（DeepSeek 官网 flash 答案 + pro 评判，297 项分层抽样）：**0.6229 vs 0.5724（+0.0505）**，时间类问题 cat1 +0.116 / cat2 +0.271 |
+
+合成套件（medium/mixed，`L11_v12_production`，3 seed）：R@20=0.9983（0.9948–1.0）/
+R@100=1.0 / MRR=0.7785（0.7427–0.8020），三个 seed 的 MRR 均高于 L9，且修复了
+L9 在 seed 20260807 上的 Recall@20 回落（0.987→0.9948）。
+真实数据（locomo10.json）：R@20 0.8958→0.9014、R@100 0.9540→0.9580、
+MRR 0.6186→0.6203（v1.1→v1.2）。
+
+**被否决的候选（保持默认关闭）**：`dense`（稠密通道，全权重网格劣于基线）、
+`entity_boost_v2`（英文增噪，R@20 −0.097）、`dedup_views_by_sources`
+（端到端 −0.0067）。`temporal_ledger` / `temporal_query_cache` 并入但仅供
+治理场景按需启用。
+
+> 端到端数字为本地相对消融口径（非官方锁定模型），只用于配置决策；官方分数
+> 以官方复测为准。

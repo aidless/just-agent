@@ -16,8 +16,7 @@ FlowGrid AML Retriever 实现记忆系统需要提供的两个操作：同步 `A
 | --- | --- | ---: | ---: | --- |
 | 文本记忆 · 开源 / 学术方法，首期公开快照 | `FlowGrid_AML_Retriever` | **第 8 名** | **43.98** | v1.0 |
 
-该快照第一名为 45.06，分差 1.08。当前仓库版本为 v1.1.0；新增的受保护时间证据
-重排已经过本地合成消融验证，但尚未获得新的官方分数。
+该快照第一名为 45.06，分差 1.08。当前仓库版本为 v1.2.0：在 v1.1 的确定性核心之上新增两项有证据支持的受控改动——缺失时间戳消息的时间兜底（`temporal_fallback`）、返回证据的日级事件时间前缀（`content_timestamp_prefix`）。这些改动已有本地合成、检索代理与端到端证据，但尚未获得新的官方分数。
 
 ## 核心能力
 
@@ -28,6 +27,8 @@ FlowGrid AML Retriever 实现记忆系统需要提供的两个操作：同步 `A
 - 融合 SQLite FTS5、中文字符 n-gram、实体/数字/日期精确特征、时间与邻接信号、
   RRF 和去重；
 - 只将受保护的事实更新作为软重排信号，旧证据不删除；
+- 缺失时间戳时按正文/会话锚点推导事件时间（`temporal_fallback`），并给返回证据
+  加日级事件时间前缀（`content_timestamp_prefix`），帮助答案模型处理时间问题；
 - 默认路径只使用 Python 标准库与 SQLite FTS5，不依赖第三方 Python 包。
 
 ## 架构
@@ -67,7 +68,7 @@ HTTP wrapper 与检索引擎分层：协议变化集中在 `api.py` 和 `server.
 git clone https://github.com/dlxeva/flowgrid-aml-retriever.git
 cd flowgrid-aml-retriever
 
-# 环境检查、146 项单测、CLI 自检、31 项 HTTP smoke
+# 环境检查、150 项单测、CLI 自检、31 项 HTTP smoke
 ./scripts/run_tests.sh
 
 # 默认启动在 127.0.0.1:8080，数据库为 ./aml.db
@@ -180,9 +181,15 @@ docker run --rm -p 8080:8080 \
 | --- | ---: | ---: | ---: |
 | v1.0 基线（`L5_plus_weighted_rrf`） | 0.9948（0.9870–1.0000） | 1.0000 | 0.6728（0.6631–0.6791） |
 | v1.1 受保护覆写（`L9_guarded_supersession`） | 0.9948（0.9870–1.0000） | 1.0000 | 0.6948（0.6854–0.7004） |
+| v1.2 生产配置（`L11_v12_production`） | 0.9983（0.9948–1.0000） | 1.0000 | 0.7785（0.7427–0.8020） |
 
-v1.1 默认配置在三个 seed 上保持 Recall@20，同时逐 seed 提升 MRR。更激进的时间权重
-虽然继续提高 MRR，但会让一个 seed 的 Recall@20 下降，因此没有成为默认值。
+v1.2 默认在 v1.1 之上启用 `temporal_fallback` 与 `content_timestamp_prefix`：三个 seed 的
+Recall@20 保持，MRR 逐 seed 提升。真实 LoCoMo 风格数据（locomo10.json，1977 查询，
+`top_k=100`）上，v1.2 默认把 Recall@20 从 0.8958 提升到 0.9014、Recall@100 从 0.9540
+提升到 0.9580、MRR 从 0.6186 提升到 0.6203。本地端到端复现（DeepSeek 官网
+`deepseek-v4-flash` 答案 + `deepseek-v4-pro` 评判，297 条分层抽样）得分 0.6229，
+v1.1 默认为 0.5724，增益集中在时间类问题。以上均为开发证据，只有官方复测才能确立
+新的官方分数。
 
 ```bash
 python3 scripts/run_eval.py \

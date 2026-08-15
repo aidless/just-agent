@@ -18,8 +18,12 @@ It does not generate final answers.
 | Text Memory · Open-source / Academic Methods, first public snapshot | `FlowGrid_AML_Retriever` | **#8** | **43.98** | v1.0 |
 
 The top score in that snapshot was 45.06, a difference of 1.08 points. The
-current repository is v1.1.0; its guarded temporal-evidence changes have local
-synthetic ablation evidence but have not been assigned a new official score.
+current repository is v1.2.0. Compared with v1.1 it adds two guarded,
+evidence-backed ranking/content changes on top of the same deterministic core:
+temporal fallback for messages without timestamps, and a day-level event-time
+prefix on returned evidence (see [docs/EVAL.md](docs/EVAL.md)). These changes
+have local synthetic, retrieval-proxy, and end-to-end evidence but have not been
+assigned a new official score.
 
 ## What it does
 
@@ -32,6 +36,10 @@ synthetic ablation evidence but have not been assigned a new official score.
   dates, temporal signals, adjacency, reciprocal-rank fusion, and deduplication.
 - Applies guarded temporal supersession as a soft ranking signal; older evidence
   remains stored and retrievable.
+- Falls back to content/anchor-derived event times when a message has no
+  timestamp (`temporal_fallback`), and prefixes returned evidence with a
+  day-level event date (`content_timestamp_prefix`) so the answer model can use
+  it on temporal questions without altering stored text.
 - Runs with Python's standard library and SQLite FTS5, with no third-party
   Python package in the default path.
 
@@ -76,7 +84,7 @@ Requirements:
 git clone https://github.com/dlxeva/flowgrid-aml-retriever.git
 cd flowgrid-aml-retriever
 
-# Environment check, 146 unit tests, CLI self-check, and 31 HTTP smoke checks
+# Environment check, 150 unit tests, CLI self-check, and 31 HTTP smoke checks
 ./scripts/run_tests.sh
 
 # Start on 127.0.0.1:8080 with ./aml.db
@@ -204,10 +212,17 @@ substitute for the official leaderboard score.
 | --- | ---: | ---: | ---: |
 | v1.0 baseline (`L5_plus_weighted_rrf`) | 0.9948 (0.9870–1.0000) | 1.0000 | 0.6728 (0.6631–0.6791) |
 | v1.1 guarded supersession (`L9_guarded_supersession`) | 0.9948 (0.9870–1.0000) | 1.0000 | 0.6948 (0.6854–0.7004) |
+| v1.2 production (`L11_v12_production`) | 0.9983 (0.9948–1.0000) | 1.0000 | 0.7785 (0.7427–0.8020) |
 
-The v1.1 default preserved Recall@20 across all three seeds while improving MRR
-on each seed. A more aggressive temporal weight improved MRR further but reduced
-Recall@20 on one seed, so it was not selected.
+The v1.2 default adds `temporal_fallback` and `content_timestamp_prefix` on top
+of v1.1: Recall@20 is preserved across all three seeds while MRR improves on
+each seed. On real LoCoMo-style data (locomo10.json, 1977 queries, `top_k=100`)
+the v1.2 default raises Recall@20 from 0.8958 to 0.9014, Recall@100 from 0.9540
+to 0.9580, and MRR from 0.6186 to 0.6203. An end-to-end local reproduction
+(DeepSeek official `deepseek-v4-flash` answers judged by `deepseek-v4-pro`,
+297-item stratified sample) scores 0.6229 vs 0.5724 for the v1.1 default, with
+the gain concentrated on temporal questions. These are development evidence;
+only an official run can establish a new official score.
 
 Reproduce a run with:
 
