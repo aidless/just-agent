@@ -1,0 +1,921 @@
+{
+  "generated_at": "2026-08-15T12:45:15+0800",
+  "repo": "flowgrid-aml-retriever",
+  "mode": "multiseed",
+  "seeds": [
+    20260806
+  ],
+  "scale": "medium",
+  "difficulty": "mixed",
+  "suite": "classic",
+  "top_k": 100,
+  "wall_clock_s": 95.44,
+  "environment": {
+    "python": "3.12.7",
+    "implementation": "CPython",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "machine": "AMD64",
+    "sqlite_library_version": "3.45.3",
+    "fts5": true,
+    "vector_backend_available": true,
+    "vector_backend_reason": "numpy importable",
+    "third_party_packages_installed": false,
+    "network_access_used": false
+  },
+  "per_seed": [
+    [
+      {
+        "stage": "L5_plus_weighted_rrf",
+        "flags": {
+          "views": true,
+          "exact": true,
+          "datenum": true,
+          "entity": true,
+          "rerank": true,
+          "temporal_intent": false,
+          "rrf": true,
+          "dedup": true,
+          "use_options": true,
+          "exact_scan": false,
+          "vector": false,
+          "supersession": false,
+          "supersession_update_guard": false,
+          "preference_role_boost": false,
+          "entity_boost_v2": false,
+          "temporal_fallback": false
+        },
+        "skipped": false,
+        "skip_reason": "",
+        "index": {
+          "add_calls": 288,
+          "messages": 5184,
+          "elapsed_s": 41.419,
+          "messages_per_s": 125.2,
+          "rows": {
+            "messages": 5184,
+            "views": 3024,
+            "users": 48,
+            "sessions": 144
+          }
+        },
+        "overall": {
+          "queries": 192,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.6631,
+          "distractor_leak@10": 0.5312,
+          "avg_returned": 63.18
+        },
+        "by_kind": {
+          "absent": {
+            "queries": 48,
+            "note": "gold 为空，不计入 Recall/MRR",
+            "avg_returned": 100.0
+          },
+          "knowledge_update": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.9163,
+            "distractor_leak@10": 0.5625,
+            "avg_returned": 28.98
+          },
+          "multi_session": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.6281,
+            "distractor_leak@10": null,
+            "avg_returned": 37.15
+          },
+          "single_hop": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5687,
+            "distractor_leak@10": null,
+            "avg_returned": 88.21
+          },
+          "temporal": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5392,
+            "distractor_leak@10": 0.5,
+            "avg_returned": 98.38
+          }
+        },
+        "by_difficulty": {
+          "paraphrase": {
+            "queries": 96,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5663,
+            "distractor_leak@10": 0.1667,
+            "avg_returned": 66.25
+          },
+          "plain": {
+            "queries": 96,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.7599,
+            "distractor_leak@10": 0.8958,
+            "avg_returned": 60.1
+          }
+        },
+        "by_kind_difficulty": {
+          "knowledge_update|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.9306,
+            "distractor_leak@10": 0.3333,
+            "avg_returned": 24.08
+          },
+          "knowledge_update|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.9021,
+            "distractor_leak@10": 0.7917,
+            "avg_returned": 33.88
+          },
+          "multi_session|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.2563,
+            "distractor_leak@10": null,
+            "avg_returned": 41.12
+          },
+          "multi_session|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": null,
+            "avg_returned": 33.17
+          },
+          "single_hop|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": null,
+            "avg_returned": 99.79
+          },
+          "single_hop|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.1374,
+            "distractor_leak@10": null,
+            "avg_returned": 76.62
+          },
+          "temporal|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.0784,
+            "distractor_leak@10": 0.0,
+            "avg_returned": 100.0
+          },
+          "temporal|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 96.75
+          }
+        },
+        "latency": {
+          "count": 240,
+          "mean_ms": 29.008,
+          "p50_ms": 31.05,
+          "p95_ms": 51.02,
+          "p99_ms": 53.255,
+          "max_ms": 77.733
+        },
+        "seed": 20260806
+      },
+      {
+        "stage": "L9_guarded_supersession",
+        "flags": {
+          "views": true,
+          "exact": true,
+          "datenum": true,
+          "entity": true,
+          "rerank": true,
+          "temporal_intent": false,
+          "rrf": true,
+          "dedup": true,
+          "use_options": true,
+          "exact_scan": false,
+          "vector": false,
+          "supersession": true,
+          "supersession_update_guard": true,
+          "preference_role_boost": false,
+          "entity_boost_v2": false,
+          "temporal_fallback": false
+        },
+        "skipped": false,
+        "skip_reason": "",
+        "index": {
+          "add_calls": 288,
+          "messages": 5184,
+          "elapsed_s": 40.002,
+          "messages_per_s": 129.6,
+          "rows": {
+            "messages": 5184,
+            "views": 3024,
+            "users": 48,
+            "sessions": 144
+          }
+        },
+        "overall": {
+          "queries": 192,
+          "recall@20": 1.0,
+          "recall@100": 1.0,
+          "mrr": 0.6854,
+          "distractor_leak@10": 0.5312,
+          "avg_returned": 63.18
+        },
+        "by_kind": {
+          "absent": {
+            "queries": 48,
+            "note": "gold 为空，不计入 Recall/MRR",
+            "avg_returned": 100.0
+          },
+          "knowledge_update": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.9163,
+            "distractor_leak@10": 0.5625,
+            "avg_returned": 28.98
+          },
+          "multi_session": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.6281,
+            "distractor_leak@10": null,
+            "avg_returned": 37.15
+          },
+          "single_hop": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.5687,
+            "distractor_leak@10": null,
+            "avg_returned": 88.21
+          },
+          "temporal": {
+            "queries": 48,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.6285,
+            "distractor_leak@10": 0.5,
+            "avg_returned": 98.38
+          }
+        },
+        "by_difficulty": {
+          "paraphrase": {
+            "queries": 96,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.6109,
+            "distractor_leak@10": 0.1667,
+            "avg_returned": 66.25
+          },
+          "plain": {
+            "queries": 96,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.7599,
+            "distractor_leak@10": 0.8958,
+            "avg_returned": 60.1
+          }
+        },
+        "by_kind_difficulty": {
+          "knowledge_update|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.9306,
+            "distractor_leak@10": 0.3333,
+            "avg_returned": 24.08
+          },
+          "knowledge_update|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.9021,
+            "distractor_leak@10": 0.7917,
+            "avg_returned": 33.88
+          },
+          "multi_session|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.2563,
+            "distractor_leak@10": null,
+            "avg_returned": 41.12
+          },
+          "multi_session|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": null,
+            "avg_returned": 33.17
+          },
+          "single_hop|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": null,
+            "avg_returned": 99.79
+          },
+          "single_hop|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.1374,
+            "distractor_leak@10": null,
+            "avg_returned": 76.62
+          },
+          "temporal|paraphrase": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 0.2569,
+            "distractor_leak@10": 0.0,
+            "avg_returned": 100.0
+          },
+          "temporal|plain": {
+            "queries": 24,
+            "recall@20": 1.0,
+            "recall@100": 1.0,
+            "mrr": 1.0,
+            "distractor_leak@10": 1.0,
+            "avg_returned": 96.75
+          }
+        },
+        "latency": {
+          "count": 240,
+          "mean_ms": 28.981,
+          "p50_ms": 32.135,
+          "p95_ms": 49.409,
+          "p99_ms": 62.151,
+          "max_ms": 77.152
+        },
+        "seed": 20260806
+      }
+    ]
+  ],
+  "aggregate": [
+    {
+      "stage": "L5_plus_weighted_rrf",
+      "flags": {
+        "views": true,
+        "exact": true,
+        "datenum": true,
+        "entity": true,
+        "rerank": true,
+        "temporal_intent": false,
+        "rrf": true,
+        "dedup": true,
+        "use_options": true,
+        "exact_scan": false,
+        "vector": false,
+        "supersession": false,
+        "supersession_update_guard": false,
+        "preference_role_boost": false,
+        "entity_boost_v2": false,
+        "temporal_fallback": false
+      },
+      "skipped": false,
+      "overall": {
+        "recall@20": {
+          "mean": 1.0,
+          "min": 1.0,
+          "max": 1.0,
+          "n": 1
+        },
+        "recall@100": {
+          "mean": 1.0,
+          "min": 1.0,
+          "max": 1.0,
+          "n": 1
+        },
+        "mrr": {
+          "mean": 0.6631,
+          "min": 0.6631,
+          "max": 0.6631,
+          "n": 1
+        },
+        "distractor_leak@10": {
+          "mean": 0.5312,
+          "min": 0.5312,
+          "max": 0.5312,
+          "n": 1
+        },
+        "avg_returned": {
+          "mean": 63.18,
+          "min": 63.18,
+          "max": 63.18,
+          "n": 1
+        }
+      },
+      "latency": {
+        "p50_ms": {
+          "mean": 31.05,
+          "min": 31.05,
+          "max": 31.05,
+          "n": 1
+        },
+        "p95_ms": {
+          "mean": 51.02,
+          "min": 51.02,
+          "max": 51.02,
+          "n": 1
+        },
+        "p99_ms": {
+          "mean": 53.255,
+          "min": 53.255,
+          "max": 53.255,
+          "n": 1
+        },
+        "max_ms": {
+          "mean": 77.733,
+          "min": 77.733,
+          "max": 77.733,
+          "n": 1
+        }
+      },
+      "by_kind_difficulty": {
+        "knowledge_update|paraphrase": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "mrr": {
+            "mean": 0.9306,
+            "min": 0.9306,
+            "max": 0.9306,
+            "n": 1
+          },
+          "distractor_leak@10": {
+            "mean": 0.3333,
+            "min": 0.3333,
+            "max": 0.3333,
+            "n": 1
+          }
+        },
+        "knowledge_update|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "mrr": {
+            "mean": 0.9021,
+            "min": 0.9021,
+            "max": 0.9021,
+            "n": 1
+          },
+          "distractor_leak@10": {
+            "mean": 0.7917,
+            "min": 0.7917,
+            "max": 0.7917,
+            "n": 1
+          }
+        },
+        "multi_session|paraphrase": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "mrr": {
+            "mean": 0.2563,
+            "min": 0.2563,
+            "max": 0.2563,
+            "n": 1
+          },
+          "distractor_leak@10": null
+        },
+        "multi_session|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "mrr": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "distractor_leak@10": null
+        },
+        "single_hop|paraphrase": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "mrr": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "distractor_leak@10": null
+        },
+        "single_hop|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "mrr": {
+            "mean": 0.1374,
+            "min": 0.1374,
+            "max": 0.1374,
+            "n": 1
+          },
+          "distractor_leak@10": null
+        },
+        "temporal|paraphrase": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "mrr": {
+            "mean": 0.0784,
+            "min": 0.0784,
+            "max": 0.0784,
+            "n": 1
+          },
+          "distractor_leak@10": {
+            "mean": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "n": 1
+          }
+        },
+        "temporal|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "mrr": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "distractor_leak@10": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          }
+        }
+      }
+    },
+    {
+      "stage": "L9_guarded_supersession",
+      "flags": {
+        "views": true,
+        "exact": true,
+        "datenum": true,
+        "entity": true,
+        "rerank": true,
+        "temporal_intent": false,
+        "rrf": true,
+        "dedup": true,
+        "use_options": true,
+        "exact_scan": false,
+        "vector": false,
+        "supersession": true,
+        "supersession_update_guard": true,
+        "preference_role_boost": false,
+        "entity_boost_v2": false,
+        "temporal_fallback": false
+      },
+      "skipped": false,
+      "overall": {
+        "recall@20": {
+          "mean": 1.0,
+          "min": 1.0,
+          "max": 1.0,
+          "n": 1
+        },
+        "recall@100": {
+          "mean": 1.0,
+          "min": 1.0,
+          "max": 1.0,
+          "n": 1
+        },
+        "mrr": {
+          "mean": 0.6854,
+          "min": 0.6854,
+          "max": 0.6854,
+          "n": 1
+        },
+        "distractor_leak@10": {
+          "mean": 0.5312,
+          "min": 0.5312,
+          "max": 0.5312,
+          "n": 1
+        },
+        "avg_returned": {
+          "mean": 63.18,
+          "min": 63.18,
+          "max": 63.18,
+          "n": 1
+        }
+      },
+      "latency": {
+        "p50_ms": {
+          "mean": 32.135,
+          "min": 32.135,
+          "max": 32.135,
+          "n": 1
+        },
+        "p95_ms": {
+          "mean": 49.409,
+          "min": 49.409,
+          "max": 49.409,
+          "n": 1
+        },
+        "p99_ms": {
+          "mean": 62.151,
+          "min": 62.151,
+          "max": 62.151,
+          "n": 1
+        },
+        "max_ms": {
+          "mean": 77.152,
+          "min": 77.152,
+          "max": 77.152,
+          "n": 1
+        }
+      },
+      "by_kind_difficulty": {
+        "knowledge_update|paraphrase": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "mrr": {
+            "mean": 0.9306,
+            "min": 0.9306,
+            "max": 0.9306,
+            "n": 1
+          },
+          "distractor_leak@10": {
+            "mean": 0.3333,
+            "min": 0.3333,
+            "max": 0.3333,
+            "n": 1
+          }
+        },
+        "knowledge_update|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "mrr": {
+            "mean": 0.9021,
+            "min": 0.9021,
+            "max": 0.9021,
+            "n": 1
+          },
+          "distractor_leak@10": {
+            "mean": 0.7917,
+            "min": 0.7917,
+            "max": 0.7917,
+            "n": 1
+          }
+        },
+        "multi_session|paraphrase": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "mrr": {
+            "mean": 0.2563,
+            "min": 0.2563,
+            "max": 0.2563,
+            "n": 1
+          },
+          "distractor_leak@10": null
+        },
+        "multi_session|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "mrr": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "distractor_leak@10": null
+        },
+        "single_hop|paraphrase": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "mrr": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "distractor_leak@10": null
+        },
+        "single_hop|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "mrr": {
+            "mean": 0.1374,
+            "min": 0.1374,
+            "max": 0.1374,
+            "n": 1
+          },
+          "distractor_leak@10": null
+        },
+        "temporal|paraphrase": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "mrr": {
+            "mean": 0.2569,
+            "min": 0.2569,
+            "max": 0.2569,
+            "n": 1
+          },
+          "distractor_leak@10": {
+            "mean": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "n": 1
+          }
+        },
+        "temporal|plain": {
+          "recall@20": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "recall@100": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "mrr": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          },
+          "distractor_leak@10": {
+            "mean": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "n": 1
+          }
+        }
+      }
+    }
+  ]
+}

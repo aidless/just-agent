@@ -30,6 +30,7 @@ from datetime import datetime, timezone
 
 from . import features
 from .config import RetrieverConfig
+from .dense import DenseIndex, backend_available
 from .entity_disambiguate import apply_entity_boost_v2
 from .temporal_fallback import (
     TimeConfidence, confidence_to_recency_weight, extract_partial_month_day,
@@ -109,6 +110,42 @@ def _msg_id(user_id: str, session_id: str | None, seq: int) -> str:
     return "m_" + hashlib.sha1(raw).hexdigest()[:16]
 
 
+def _dedup_impl(ordered: list[dict], *, drop_views_by_sources: bool) -> list[dict]:
+    """候选去重：内容完全相同的记录只保留一条。
+
+    drop_views_by_sources=True 时，聚合视图若其全部来源消息都已被保留，
+    则丢弃该视图（原文证据优先于冗余视图）。召回安全性：gold 按
+    source_message_ids 判定，来源消息在列表中就命中，因此这不降低 Recall@K。
+    """
+    seen_hash: set[str] = set()
+    kept: list[dict] = []
+    covered: list[set] = []
+    kept_msg_ids: set[str] = set()
+    for rec in ordered:
+        digest = hashlib.sha1((rec["content"] or "").encode("utf-8")).hexdigest()
+        if digest in seen_hash:
+            continue
+        sources = set(rec["source_ids"])
+        # 聚合视图若已被某条保留视图完全覆盖，则丢弃（原始消息永不丢弃）
+        if rec["view"] != "message" and any(sources <= c for c in covered):
+            continue
+        # 优化开关：视图的所有来源消息都已保留时，视图是纯冗余
+        if (
+            drop_views_by_sources
+            and rec["view"] != "message"
+            and sources
+            and sources <= kept_msg_ids
+        ):
+            continue
+        seen_hash.add(digest)
+        if rec["view"] != "message":
+            covered.append(sources)
+        else:
+            kept_msg_ids.add(rec["id"])
+        kept.append(rec)
+    return kept
+
+
 class RetrieverDB:
     """存储 + 检索引擎。线程安全：每线程独立连接，写操作串行化。"""
 
@@ -129,9 +166,22 @@ class RetrieverDB:
         if self.db_path == ":memory:":
             self._shared_mem_con = self._new_connection()
 
+        self._dense: DenseIndex | None = None
+
         self._init_schema()
 
     # ------------------------------------------------------------- connection
+    def _dense_index(self) -> DenseIndex | None:
+        """惰性初始化稠密索引（仅 flags["dense"] 开启时）。"""
+        if not self.flags.get("dense", False):
+            return None
+        ok, _ = backend_available()
+        if not ok:
+            return None
+        if self._dense is None:
+            self._dense = DenseIndex(self)
+        return self._dense
+
     def _new_connection(self) -> sqlite3.Connection:
         con = sqlite3.connect(self.db_path, timeout=self.config.busy_timeout_ms / 1000.0,
                               check_same_thread=False)
@@ -318,21 +368,40 @@ class RetrieverDB:
                 "has_temporal_expr": int(has_temporal_expression(content)) if ts is None and absolute is None and partial is None else 0,
             })
 
-        return self._write(self._add_locked, request_id, user_id, session_id, normalized)
+        result = self._write(self._add_locked, request_id, user_id, session_id, normalized)
+        # 幂等命中时 _add_locked 返回 (AddResult, None)；新写入返回 (AddResult, dense_docs)
+        if isinstance(result, tuple) and len(result) == 2:
+            add_result, dense_docs = result
+            self._embed_dense_after_add(user_id, dense_docs)
+            return add_result
+        return result
 
-    def _add_locked(self, con, request_id, user_id, session_id, normalized) -> AddResult:
+    def _embed_dense_after_add(self, user_id: str, dense_docs: list[tuple[str, str]]) -> None:
+        """事务提交后为新增文档嵌入向量（CPU 密集，避免占用写锁）。"""
+        if not dense_docs:
+            return
+        dense = self._dense_index()
+        if dense is None:
+            return
+        try:
+            dense.add_docs(user_id, [d for d, _ in dense_docs], [c for _, c in dense_docs])
+        except Exception:
+            # 稠密通道失败不回滚已提交的写入；下次 Search 自动退回词法路径
+            pass
+
+    def _add_locked(self, con, request_id, user_id, session_id, normalized):
         row = con.execute(
             "SELECT message_ids FROM requests WHERE request_id=? AND user_id=?",
             (request_id, user_id),
         ).fetchone()
         if row is not None:  # 幂等：同 (request_id, user_id) 不重复落库
-            return AddResult(
+            return (AddResult(
                 request_id=request_id,
                 user_id=user_id,
                 session_id=session_id,
                 message_ids=json.loads(row["message_ids"]),
                 idempotent=True,
-            )
+            ), None)
 
         state = con.execute(
             "SELECT msg_count, last_ts_ms, seg_index, seg_start, seg_count "
@@ -350,6 +419,7 @@ class RetrieverDB:
         max_seg = max(1, int(self.config.segment_max_messages))
         touched_segments: list[tuple[int, int]] = []
         new_ids: list[str] = []
+        dense_docs: list[tuple[str, str]] = []
 
         for offset, item in enumerate(normalized):
             seq = old_count + offset
@@ -366,6 +436,7 @@ class RetrieverDB:
             )
             self._index_doc(con, mid, user_id, "message", item["content"])
             new_ids.append(mid)
+            dense_docs.append((mid, item["content"]))
 
             # 段边界：从左到右、确定性，与 views.segment_boundaries 全量扫描等价
             if seg_count > 0:
@@ -402,17 +473,18 @@ class RetrieverDB:
         )
 
         if self.flags.get("views", True):
-            self._rebuild_incremental_views(
+            view_docs = self._rebuild_incremental_views(
                 con, user_id, session_id, old_count, new_count, touched_segments
             )
+            dense_docs.extend(view_docs)
 
-        return AddResult(
+        return (AddResult(
             request_id=request_id,
             user_id=user_id,
             session_id=session_id,
             message_ids=new_ids,
             idempotent=False,
-        )
+        ), dense_docs)
 
     # ------------------------------------------------------------------ views
     def _session_rows(self, con, user_id, session_id, start, end) -> list[dict]:
@@ -425,15 +497,17 @@ class RetrieverDB:
 
     def _rebuild_incremental_views(
         self, con, user_id, session_id, old_count, new_count, touched_segments
-    ) -> None:
+    ) -> list[tuple[str, str]]:
+        """重建受影响视图；返回本次实际 upsert 的 (view_id, content) 列表。"""
         size = max(1, int(self.config.window_size))
         overlap = max(0, int(self.config.window_overlap))
+        view_docs: list[tuple[str, str]] = []
 
         for start in affected_window_starts(old_count, new_count, size, overlap):
             chunk = self._session_rows(con, user_id, session_id, start, start + size - 1)
             if not chunk:
                 continue
-            self._upsert_view(
+            doc = self._upsert_view(
                 con,
                 view_id=window_view_id(user_id, session_id, start),
                 user_id=user_id,
@@ -443,6 +517,8 @@ class RetrieverDB:
                 start_seq=start,
                 end_seq=start + len(chunk) - 1,
             )
+            if doc:
+                view_docs.append(doc)
 
         for idx, (seg_idx, seg_start) in enumerate(touched_segments):
             seg_end = (
@@ -453,7 +529,7 @@ class RetrieverDB:
             chunk = self._session_rows(con, user_id, session_id, seg_start, seg_end)
             if not chunk:
                 continue
-            self._upsert_view(
+            doc = self._upsert_view(
                 con,
                 view_id=segment_view_id(user_id, session_id, seg_idx),
                 user_id=user_id,
@@ -463,17 +539,20 @@ class RetrieverDB:
                 start_seq=seg_start,
                 end_seq=seg_end,
             )
+            if doc:
+                view_docs.append(doc)
+        return view_docs
 
     def _upsert_view(
         self, con, *, view_id, user_id, session_id, view_type, chunk, start_seq, end_seq
-    ) -> None:
+    ) -> tuple[str, str] | None:
         content = join_content(chunk)
         digest = hashlib.sha1(content.encode("utf-8")).hexdigest()
         existing = con.execute(
             "SELECT content_hash FROM views WHERE view_id=?", (view_id,)
         ).fetchone()
         if existing is not None and existing["content_hash"] == digest:
-            return  # 内容未变，避免无谓的 FTS 抖动
+            return None  # 内容未变，避免无谓的 FTS 抖动
         con.execute(
             "INSERT OR REPLACE INTO views"
             "(view_id,user_id,session_id,view_type,content,created_at,source_ids,start_seq,end_seq,content_hash) "
@@ -486,6 +565,7 @@ class RetrieverDB:
             ),
         )
         self._index_doc(con, view_id, user_id, view_type, content)
+        return (view_id, content)
 
     def _index_doc(self, con, doc_id, user_id, doc_type, content) -> None:
         con.execute("DELETE FROM fts WHERE doc_id=?", (doc_id,))
@@ -554,11 +634,28 @@ class RetrieverDB:
             raw_candidates = self._fts_candidates(con, user_id, tokens)
             if not raw_candidates and self.flags.get("exact_scan", False):
                 raw_candidates = self._like_fallback(con, user_id, query)
-            if not raw_candidates:
+            dense_candidates: list[tuple[str, float]] = []
+            dense = self._dense_index()
+            if dense is not None:
+                try:
+                    dense_candidates = dense.top_n(
+                        user_id, recall_text, int(self.config.dense_top_n)
+                    )
+                except Exception:
+                    dense_candidates = []  # 稠密失败 → 纯词法路径，不改变语义
+            if not raw_candidates and not dense_candidates:
                 return SearchResult(request_id=request_id, total=0, results=[])
+            # 稠密候选与词法候选按 doc_id 合并去重（稠密补充词法漏掉的文档）
+            merged: dict[str, tuple[str, str, float]] = {}
+            for doc_id, doc_type, rank in raw_candidates:
+                merged.setdefault(doc_id, (doc_id, doc_type, rank))
+            for doc_id, _score in dense_candidates:
+                merged.setdefault(doc_id, (doc_id, "dense", 0.0))
+            raw_candidates = list(merged.values())
             records = self._load_records(con, user_id, raw_candidates)
 
-        fts_order = [doc_id for doc_id, _t, _r in raw_candidates]
+        fts_order = [doc_id for doc_id, _t, _r in raw_candidates if _t != "dense"]
+        dense_order = [doc_id for doc_id, _score in dense_candidates]
         rank_map = {doc_id: rank for doc_id, _t, rank in raw_candidates}
         if not records:
             return SearchResult(request_id=request_id, total=0, results=[])
@@ -576,7 +673,7 @@ class RetrieverDB:
                 config=self.config,
             )
 
-        ordered = self._fuse_and_order(scored, fts_order)
+        ordered = self._fuse_and_order(scored, fts_order, dense_order=dense_order)
         if self.flags.get("dedup", True):
             ordered = self._dedup(ordered)
         final = self._apply_slot_guarantee(ordered, limit)
@@ -586,7 +683,7 @@ class RetrieverDB:
                 id=r["id"],
                 user_id=user_id,
                 view=r["view"],
-                content=r["content"],
+                content=self._content_for_response(r),
                 created_at=r["created_at"] or "",
                 score=round(float(r["score"]), 6),
                 source_message_ids=r["source_ids"],
@@ -597,9 +694,57 @@ class RetrieverDB:
         ]
         return SearchResult(request_id=request_id, total=len(ordered), results=results)
 
+    def _content_for_response(self, rec: dict) -> str:
+        """内容塑造：按配置给返回内容附加事件时间元数据（不改原文，不改排序）。
+
+        官方答案指令允许“memory timestamp 明确时把相对时间转成日期”，而
+        Search 响应只把 content 喂给答案模型；因此把事件时间以
+        ``[<时间>]`` 前缀注入 content，可让答案模型在时间问题上使用它。
+        时间取原始粒度保守表达（仅日期），避免粒度升级；关闭时原样返回。
+        """
+        content = rec.get("content") or ""
+        if not self.flags.get("content_timestamp_prefix", False):
+            return content
+        ts = self._event_date_prefix(rec)
+        if not ts:
+            return content
+        return f"[{ts}] {content}"
+
+    @staticmethod
+    def _event_date_prefix(rec: dict) -> str:
+        """事件时间的日期级表达：优先原文自带的绝对日期（保持其粒度），
+        其次 ts_ms/created_at 的日期部分。粒度不高于 day，绝不伪造精度。"""
+        from datetime import datetime, timezone as _tz
+
+        abs_expr = rec.get("abs_expression")
+        if abs_expr:
+            return str(abs_expr)
+        epoch = RetrieverDB._epoch_of(rec)
+        if epoch is None:
+            return ""
+        try:
+            return datetime.fromtimestamp(epoch, tz=_tz.utc).strftime("%Y-%m-%d")
+        except (TypeError, ValueError, OSError, OverflowError):
+            return ""
+
     def _load_records(self, con, user_id, raw_candidates) -> list[dict]:
         msg_ids = [d for d, t, _ in raw_candidates if t == "message"]
-        view_ids = [d for d, t, _ in raw_candidates if t != "message"]
+        view_ids = [d for d, t, _ in raw_candidates if t not in ("message", "dense")]
+        # 稠密通道的候选 doc_id 类型未知：先尝试按消息加载，剩余的按视图加载
+        unknown_ids = [d for d, t, _ in raw_candidates if t == "dense"]
+        if unknown_ids:
+            found_msg: set[str] = set()
+            chunk_u = 400
+            for i in range(0, len(unknown_ids), chunk_u):
+                part = unknown_ids[i : i + chunk_u]
+                ph = ",".join("?" * len(part))
+                for r in con.execute(
+                    f"SELECT id FROM messages WHERE id IN ({ph}) AND user_id=?",
+                    (*part, user_id),
+                ).fetchall():
+                    found_msg.add(r["id"])
+            msg_ids.extend(sorted(found_msg))
+            view_ids.extend(sorted(set(unknown_ids) - found_msg))
         out: list[dict] = []
         chunk = 400
         for i in range(0, len(msg_ids), chunk):
@@ -1070,13 +1215,13 @@ class RetrieverDB:
                 if "superseded" not in rec["flags"]:
                     rec["flags"].append("superseded")
 
-    def _fuse_and_order(self, records, fts_order) -> list[dict]:
+    def _fuse_and_order(self, records, fts_order, dense_order=None) -> list[dict]:
         feat_order = [
             r["id"]
             for r in sorted(records, key=lambda x: (-x["score"], len(x["content"] or ""), x["id"]))
         ]
         if self.flags.get("rrf", True):
-            # 加权 RRF：特征路与词法路权重可配。
+            # 加权 RRF：特征路与词法路权重可配（稠密通道开启时加入第三路）。
             # 实测（docs/EVAL.md 附录 A，合成集 medium）：提高词法权重会**持续抬高 MRR**
             # 同时**持续压低 Recall@20**（Recall@100 恒为 1.0，说明 gold 没丢、只是被挤出前 20）。
             # 默认 w_lex=0.1 是扫描点中唯一 Pareto 安全的取值：三种难度 MRR 均正增益且
@@ -1086,7 +1231,12 @@ class RetrieverDB:
             w_feat = float(getattr(self.config, "rrf_weight_feature", 1.0))
             w_lex = float(getattr(self.config, "rrf_weight_lexical", 0.25))
             fused: dict[str, float] = {}
-            for order, weight in ((feat_order, w_feat), (fts_order, w_lex)):
+            channels = [(feat_order, w_feat), (fts_order, w_lex)]
+            if dense_order:
+                w_dense = float(getattr(self.config, "dense_rrf_weight", 0.5))
+                if w_dense != 0.0:
+                    channels.append((dense_order, w_dense))
+            for order, weight in channels:
                 if weight == 0.0:
                     continue
                 for pos, doc_id in enumerate(order):
@@ -1098,42 +1248,47 @@ class RetrieverDB:
         # 确定性排序：分值降序 -> 内容短优先 -> id 升序
         return sorted(records, key=lambda x: (-x["score"], len(x["content"] or ""), x["id"]))
 
-    @staticmethod
-    def _dedup(ordered: list[dict]) -> list[dict]:
-        seen_hash: set[str] = set()
-        kept: list[dict] = []
-        covered: list[set] = []
-        for rec in ordered:
-            digest = hashlib.sha1((rec["content"] or "").encode("utf-8")).hexdigest()
-            if digest in seen_hash:
-                continue
-            sources = set(rec["source_ids"])
-            # 聚合视图若已被某条保留视图完全覆盖，则丢弃（原始消息永不丢弃）
-            if rec["view"] != "message" and any(sources <= c for c in covered):
-                continue
-            seen_hash.add(digest)
-            if rec["view"] != "message":
-                covered.append(sources)
-            kept.append(rec)
-        return kept
+    def _dedup(self, ordered: list[dict]) -> list[dict]:
+        if self.flags.get("dedup_views_by_sources", False):
+            return _dedup_impl(ordered, drop_views_by_sources=True)
+        return _dedup_impl(ordered, drop_views_by_sources=False)
 
     def _apply_slot_guarantee(self, ordered: list[dict], limit: int) -> list[dict]:
-        """保证 top_k 中原始消息占比不低于配置比例（聚合视图不得挤掉原始证据）。"""
+        """保证 top_k 中原始消息占比不低于配置比例（聚合视图不得挤掉原始证据）。
+
+        view_max_ratio<1 时，进一步限制聚合视图在 top_k 中的占比；
+        被挤出的位置按原排序补入原始消息（仅当有足够消息可补）。
+        """
         head = ordered[:limit]
         ratio = float(self.config.message_slot_ratio or 0.0)
-        if ratio <= 0 or len(ordered) <= limit:
+        view_cap = int(limit * (1.0 - float(self.config.view_max_ratio or 1.0)))
+        if ratio <= 0 and view_cap <= 0:
             return head
+        if len(ordered) <= limit:
+            return head
+        # 先按 message_slot_ratio 保底消息
         need = int(limit * ratio)
         have = sum(1 for r in head if r["view"] == "message")
-        if have >= need:
-            return head
-        extra = [r for r in ordered[limit:] if r["view"] == "message"][: need - have]
-        if not extra:
-            return head
         keep = [r for r in head if r["view"] == "message"]
         fillers = [r for r in head if r["view"] != "message"]
-        drop = len(extra)
-        merged = keep + extra + fillers[: max(0, len(fillers) - drop)]
+        extra = [r for r in ordered[limit:] if r["view"] == "message"]
+        if have < need and extra:
+            drop = min(need - have, len(fillers), len(extra))
+            merged = keep + extra[:drop] + fillers[: max(0, len(fillers) - drop)]
+        else:
+            merged = head
+        # 视图占比上限：超出的视图从尾部挤出，用后续消息补位
+        if 0 < view_cap < limit:
+            msgs = [r for r in merged if r["view"] == "message"]
+            views = [r for r in merged if r["view"] != "message"]
+            if len(views) > view_cap:
+                overflow = views[view_cap:]
+                spare = [r for r in ordered[limit:] if r["view"] == "message"
+                         and r not in msgs][: len(overflow)]
+                merged = sorted(
+                    msgs + spare + views[:view_cap],
+                    key=lambda x: (-x["score"], len(x["content"] or ""), x["id"]),
+                )
         return sorted(merged, key=lambda x: (-x["score"], len(x["content"] or ""), x["id"]))[:limit]
 
     # -------------------------------------------------- 隐私与生命周期（删除）
@@ -1150,20 +1305,38 @@ class RetrieverDB:
             con.execute("DELETE FROM views WHERE user_id=?", (user_id,))
             con.execute("DELETE FROM requests WHERE user_id=?", (user_id,))
             con.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
+            try:  # dense_vectors 表惰性创建；未启用稠密通道时可能不存在
+                con.execute("DELETE FROM dense_vectors WHERE user_id=?", (user_id,))
+            except sqlite3.OperationalError:
+                pass
             return {"user_id": user_id, "deleted_messages": n_msg, "deleted_views": n_view}
 
-        return self._write(_do)
+        result = self._write(_do)
+        if self._dense is not None:
+            with self._dense._lock:
+                self._dense._cache.pop(user_id, None)
+        return result
 
     def purge_all(self) -> dict:
         def _do(con):
             n = con.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
-            con.executescript(
-                "DELETE FROM fts; DELETE FROM messages; DELETE FROM views; "
-                "DELETE FROM requests; DELETE FROM sessions;"
-            )
+            try:  # dense_vectors 表惰性创建；未启用稠密通道时可能不存在
+                con.executescript(
+                    "DELETE FROM fts; DELETE FROM messages; DELETE FROM views; "
+                    "DELETE FROM requests; DELETE FROM sessions; DELETE FROM dense_vectors;"
+                )
+            except sqlite3.OperationalError:
+                con.executescript(
+                    "DELETE FROM fts; DELETE FROM messages; DELETE FROM views; "
+                    "DELETE FROM requests; DELETE FROM sessions;"
+                )
             return {"deleted_messages": n}
 
-        return self._write(_do)
+        result = self._write(_do)
+        if self._dense is not None:
+            with self._dense._lock:
+                self._dense._cache.clear()
+        return result
 
     # --------------------------------------------------------------- 只读辅助
     def query(self, sql: str, params: tuple = ()) -> list[sqlite3.Row]:

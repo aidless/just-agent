@@ -54,6 +54,18 @@ DEFAULT_FLAGS: dict[str, bool] = {
     # vNext：当 ts_ms 缺失时，按正文时间表达／会话锚点／created_at 逐层兜底。
     # 默认关闭，避免改变现有新近度语义。
     "temporal_fallback": False,
+    # 优化（消融中）：当某条聚合视图的全部来源消息都已出现在保留结果中时，
+    # 丢弃该视图（原文证据优先级高于冗余视图）。关闭时保持 v1.1 行为。
+    "dedup_views_by_sources": False,
+    # 优化（消融中）：per-user 稠密检索通道（fastembed + bge-small-en-v1.5）。
+    # 默认关闭；后端不可用/超时自动回退纯确定性路径。仅存 message/view ID，
+    # 按 user_id 隔离，绝不把不同用户的向量合并进共享候选池。
+    "dense": False,
+    # 优化（消融中）：返回 content 前给证据加 [事件时间] 前缀（日期级，不改
+    # 原文、不改排序）。官方答案指令允许“memory timestamp 明确时把相对时间
+    # 转成日期”，而 Search 只把 content 喂给答案模型，故该前缀是时间类问题
+    # 的端到端杠杆。粒度不高于 day，绝不伪造精度。
+    "content_timestamp_prefix": False,
 }
 
 
@@ -74,6 +86,16 @@ class RetrieverConfig:
     max_candidates: int = 400     # FTS 候选上限，界定单次 Search 的最坏代价
     max_query_tokens: int = 64    # 查询 token 上限，界定 FTS 查询规模
     message_slot_ratio: float = 0.5  # top_k 中保底留给原始消息的比例
+    # 聚合视图（window/session-segment）在最终 top_k 中的最大占比。
+    # 1.0 表示不额外限制（v1.1 行为，只靠 message_slot_ratio 保底 50% 消息）；
+    # 调低会把更多原始消息挤进前 top_k，代价是视图的邻接上下文变少。
+    # 该值只在 dedup_views_by_sources 关闭时仍生效于未被去重的视图。
+    view_max_ratio: float = 1.0
+
+    # 稠密通道参数（flags["dense"] 开启时生效）
+    dense_top_n: int = 80          # 稠密通道候选数
+    dense_rrf_weight: float = 0.5  # 三路 RRF 中稠密通道的权重（词法 0.1 / 特征 1.0）
+    dense_model: str = "BAAI/bge-small-en-v1.5"
 
     # 加权 RRF 融合参数（仅在 flags["rrf"] 开启时生效）。
     # 权重扫描（docs/EVAL.md 附录 A）显示：w_lexical 越大 MRR 越高、Recall@20 越低。
