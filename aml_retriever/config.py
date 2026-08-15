@@ -72,6 +72,10 @@ DEFAULT_FLAGS: dict[str, bool] = {
     # flash+pro，297 项）实测 0.6229 vs 基线 0.5724（+0.0505），时间类
     # 问题（cat1 +0.116 / cat2 +0.271）大幅提升。粒度不高于 day，绝不伪造精度。
     "content_timestamp_prefix": True,
+    # v1.2.1：前缀默认**仅对含时间/日期意图的查询**生效（消融证据：无条件
+    # 前缀在非时间类问题小幅回退，cat4 −0.008 / cat5 −0.030）。设 True 恢复
+    # v1.2 的无条件行为（供对照消融）。
+    "content_timestamp_prefix_unconditional": False,
 }
 
 

@@ -328,6 +328,53 @@ class TestTemporalRanking(EngineCase):
             db.close()
 
 
+class TestTimestampPrefixGating(EngineCase):
+    """v1.2.1：content_timestamp_prefix 仅对时间/日期意图查询加前缀（默认）。"""
+
+    def _search_content(self, cfg, query):
+        db = RetrieverDB(cfg)
+        try:
+            db.add(request_id="ts", user_id="u1", session_id="s1", messages=[
+                {"role": "user", "content": "发布日期定在 2026-08-14。", "timestamp": 1_600_000_000_000},
+            ])
+            res = db.search(user_id="u1", query=query, top_k=5)
+            return [e.content for e in res.results if e.view == "message"]
+        finally:
+            db.close()
+
+    def test_temporal_query_gets_prefix_by_default(self):
+        cfg = RetrieverConfig(db_path=":memory:").with_flags(views=False, rrf=False, dedup=False)
+        contents = self._search_content(cfg, "发布日期是什么时候？")
+        self.assertTrue(contents)
+        self.assertTrue(contents[0].startswith("["), contents[0])
+
+    def test_plain_query_no_prefix_by_default(self):
+        cfg = RetrieverConfig(db_path=":memory:").with_flags(views=False, rrf=False, dedup=False)
+        contents = self._search_content(cfg, "发布会的负责人是谁？")
+        self.assertTrue(contents)
+        self.assertFalse(contents[0].startswith("["), contents[0])
+
+    def test_explicit_date_query_gets_prefix(self):
+        """v1.2.1：查询含显式日期/月份名/时长也应加前缀（消融中发现漏检导致 cat2 回退）。"""
+        from aml_retriever import features
+
+        self.assertTrue(features.has_temporal_context("What was Sam doing on December 4, 2023?"))
+        self.assertTrue(features.has_temporal_context("Which city was Calvin at on October 3, 2023?"))
+        self.assertTrue(features.has_temporal_context("How many months lapsed between the appointments?"))
+        self.assertTrue(features.has_temporal_context("发布日期是什么时候？"))
+        self.assertFalse(features.has_temporal_context("发布会的负责人是谁？"))
+        self.assertFalse(features.has_temporal_context("Which pet did Jolene adopt first - Susie or Seraphim?"))
+
+    def test_unconditional_mode_restores_v12_prefix(self):
+        cfg = RetrieverConfig(db_path=":memory:").with_flags(
+            views=False, rrf=False, dedup=False,
+            content_timestamp_prefix_unconditional=True,
+        )
+        contents = self._search_content(cfg, "发布会的负责人是谁？")
+        self.assertTrue(contents)
+        self.assertTrue(contents[0].startswith("["), contents[0])
+
+
 class TestAblationFlags(EngineCase):
     def test_flags_can_be_disabled(self):
         cfg = RetrieverConfig(db_path=self.path).with_flags(views=False, rrf=False, rerank=False)

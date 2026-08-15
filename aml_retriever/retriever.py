@@ -687,7 +687,7 @@ class RetrieverDB:
                 id=r["id"],
                 user_id=user_id,
                 view=r["view"],
-                content=self._content_for_response(r),
+                content=self._content_for_response(r, query),
                 created_at=r["created_at"] or "",
                 score=round(float(r["score"]), 6),
                 source_message_ids=r["source_ids"],
@@ -698,17 +698,24 @@ class RetrieverDB:
         ]
         return SearchResult(request_id=request_id, total=len(ordered), results=results)
 
-    def _content_for_response(self, rec: dict) -> str:
+    def _content_for_response(self, rec: dict, query: str = "") -> str:
         """内容塑造：按配置给返回内容附加事件时间元数据（不改原文，不改排序）。
 
         官方答案指令允许“memory timestamp 明确时把相对时间转成日期”，而
         Search 响应只把 content 喂给答案模型；因此把事件时间以
         ``[<时间>]`` 前缀注入 content，可让答案模型在时间问题上使用它。
         时间取原始粒度保守表达（仅日期），避免粒度升级；关闭时原样返回。
+
+        v1.2.1：默认**仅对含时间/日期意图的查询**加前缀（消融证据：无条件前缀
+        在非时间类问题上小幅回退，cat4 −0.008 / cat5 −0.030）；设置
+        ``content_timestamp_prefix_unconditional`` 可恢复 v1.2 的无条件行为。
         """
         content = rec.get("content") or ""
         if not self.flags.get("content_timestamp_prefix", False):
             return content
+        if not self.flags.get("content_timestamp_prefix_unconditional", False):
+            if not features.has_temporal_context(query or ""):
+                return content
         ts = self._event_date_prefix(rec)
         if not ts:
             return content

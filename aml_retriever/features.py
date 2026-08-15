@@ -154,6 +154,57 @@ def has_date_value_intent(text: str) -> bool:
     return any(marker in lowered for marker in _DATE_INTENT_EN)
 
 
+# 英文月份名（含缩写）——查询中出现月份 = 时间上下文
+_MONTH_NAME_RE = re.compile(
+    r"\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|"
+    r"aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b",
+    re.IGNORECASE,
+)
+
+# 时长意图：问"多久/几个月/几年"这类时间跨度
+_DURATION_INTENT_EN = (
+    "how long", "how many months", "how many days", "how many weeks",
+    "how many years", "how many hours", "how long ago", "lapsed between",
+    "duration", "time span",
+)
+_DURATION_INTENT_CN = ("多久", "多长时间", "几个月", "几天", "几周", "几年", "间隔", "历时")
+
+
+def has_explicit_date(text: str) -> bool:
+    """查询文本是否含显式日期（数字/中文日期或英文月份名）。"""
+    if not text:
+        return False
+    return bool(extract_dates(text) or _MONTH_NAME_RE.search(text))
+
+
+def has_duration_intent(text: str) -> bool:
+    """判断查询是否在问时间跨度（多久/几个月等）。"""
+    if not text:
+        return False
+    lowered = text.lower()
+    if any(marker in text for marker in _DURATION_INTENT_CN):
+        return True
+    return any(marker in lowered for marker in _DURATION_INTENT_EN)
+
+
+def has_temporal_context(text: str) -> bool:
+    """v1.2.1 时间前缀的统一门控：时间/日期意图、显式日期、月份名或时长意图。
+
+    消融证据（locomo10 297 项）：无条件前缀在非时间类问题回退（cat4 −0.008 /
+    cat5 −0.030），而仅靠 has_temporal_intent/has_date_value_intent 会漏掉
+    23% 的日期类问题（如 "What was Sam doing on December 4, 2023?" /
+    "How many months lapsed between..."），导致 cat2 回退 −0.063。
+    """
+    if not text:
+        return False
+    return (
+        has_temporal_intent(text)
+        or has_date_value_intent(text)
+        or has_explicit_date(text)
+        or has_duration_intent(text)
+    )
+
+
 def cjk_ngrams(text: str, n: int) -> list[str]:
     out: list[str] = []
     for match in _CJK_RE.finditer(text or ""):
@@ -256,4 +307,7 @@ __all__ = [
     "has_direct_preference_statement",
     "has_numeric_value_intent",
     "has_date_value_intent",
+    "has_explicit_date",
+    "has_duration_intent",
+    "has_temporal_context",
 ]
