@@ -46,9 +46,11 @@ DEFAULT_FLAGS: dict[str, bool] = {
     # 显式更新保护：仅允许带通用更新语义（如“更新为 / no longer”）的较新消息
     # 覆写旧消息。它只在 supersession 同时开启时生效；v1.1 将两者组合启用。
     "supersession_update_guard": True,
-    # 个性化证据来源：偏好类查询中，轻度抬高用户本人直接陈述，绝不删除
-    # assistant 转述或其他原始证据。代理集虽显示正收益，但场景宽度仍不足，默认关闭。
-    "preference_role_boost": False,
+    # 个性化证据来源（v1.3 默认启用）：偏好类查询中，轻度抬高用户本人直接陈述，
+    # 绝不删除 assistant 转述或其他原始证据。PersonaMem-v2 检索实测：MRR
+    # 0.346 → 0.607（+0.261）、R@20 +0.085（200 行样本）；locomo10 零回归
+    # （0.9074/0.9565/0.6324 逐位一致）。只对 has_preference_intent 查询生效。
+    "preference_role_boost": True,
     # vNext：实体消歧后的软提升。默认关闭，先通过离线消融确认净收益。
     "entity_boost_v2": False,
     # 时间兜底（v1.2 默认启用）：当 ts_ms 缺失时，按正文时间表达／会话锚点／

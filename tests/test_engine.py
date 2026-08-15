@@ -241,7 +241,9 @@ class TestTemporalRanking(EngineCase):
         self.assertLessEqual(RetrieverConfig().rrf_weight_lexical, 0.25)
         self.assertTrue(DEFAULT_FLAGS["supersession"])
         self.assertTrue(DEFAULT_FLAGS["supersession_update_guard"])
-        self.assertFalse(DEFAULT_FLAGS["preference_role_boost"])
+        # v1.3：preference_role_boost 默认启用（PersonaMem-v2 MRR +0.261，locomo 零回归）
+        self.assertTrue(DEFAULT_FLAGS["preference_role_boost"])
+        self.assertFalse(DEFAULT_FLAGS["temporal_intent"])
 
     def test_update_guard_rejects_newer_non_update_noise(self):
         cfg = RetrieverConfig(db_path=":memory:").with_flags(
