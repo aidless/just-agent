@@ -250,8 +250,14 @@ class TestLadderIntegrity(unittest.TestCase):
 
         production = {k for k, v in table[PRODUCTION_STAGE].items() if v}
         preference = {k for k, v in table["L10_preference_ctrl"].items() if v}
-        self.assertEqual(preference - production, {"preference_role_boost"})
-        self.assertFalse(production - preference)
+        # L10 只相对 L9 增加 preference_role_boost（L10 不包含 v1.2 的两个新开关）
+        base_v11 = {k for k, v in table["L9_guarded_supersession"].items() if v}
+        self.assertEqual(preference - base_v11, {"preference_role_boost"})
+        self.assertFalse(base_v11 - preference)
+        # v1.2 生产档 L11 相对 L9 只新增 temporal_fallback + content_timestamp_prefix
+        self.assertEqual(production - base_v11,
+                         {"temporal_fallback", "content_timestamp_prefix"})
+        self.assertFalse(base_v11 - production)
         guarded = {k for k, v in table["L9_guarded_supersession"].items() if v}
         unguarded = {k for k, v in table["L8_supersession_ctrl"].items() if v}
         self.assertEqual(guarded - unguarded, {"supersession_update_guard"})

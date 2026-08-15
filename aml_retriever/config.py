@@ -51,24 +51,27 @@ DEFAULT_FLAGS: dict[str, bool] = {
     "preference_role_boost": False,
     # vNext：实体消歧后的软提升。默认关闭，先通过离线消融确认净收益。
     "entity_boost_v2": False,
-    # vNext：当 ts_ms 缺失时，按正文时间表达／会话锚点／created_at 逐层兜底。
-    # 默认关闭，避免改变现有新近度语义。
-    "temporal_fallback": False,
+    # 时间兜底（v1.2 默认启用）：当 ts_ms 缺失时，按正文时间表达／会话锚点／
+    # created_at 逐层兜底。locomo10 全量门禁：R@20 +0.006 / R@100 +0.004 /
+    # MRR +0.001；端到端（DeepSeek 官网 flash+pro）0.5758 vs 基线 0.5724。
+    "temporal_fallback": True,
     # 优化（消融中）：当某条聚合视图的全部来源消息都已出现在保留结果中时，
-    # 丢弃该视图（原文证据优先级高于冗余视图）。关闭时保持 v1.1 行为。
+    # 丢弃该视图（原文证据优先级高于冗余视图）。端到端实测 −0.0067，不启用。
     "dedup_views_by_sources": False,
     # 优化（消融中）：per-user 稠密检索通道（fastembed + bge-small-en-v1.5）。
     # 默认关闭；后端不可用/超时自动回退纯确定性路径。仅存 message/view ID，
-    # 按 user_id 隔离，绝不把不同用户的向量合并进共享候选池。
+    # 按 user_id 隔离，绝不把不同用户的向量合并进共享候选池。全权重网格门禁
+    # 均劣于基线，冻结关闭。
     "dense": False,
     # 稠密索引是否包含聚合视图（默认 False：只嵌原始消息，视图内容蕴含在
     # 消息里，嵌入长拼接视图会显著拖慢 Add）。只影响索引内容，不影响语义。
     "dense_index_views": False,
-    # 优化（消融中）：返回 content 前给证据加 [事件时间] 前缀（日期级，不改
+    # 返回 content 前给证据加 [事件时间] 前缀（v1.2 默认启用；日期级，不改
     # 原文、不改排序）。官方答案指令允许“memory timestamp 明确时把相对时间
-    # 转成日期”，而 Search 只把 content 喂给答案模型，故该前缀是时间类问题
-    # 的端到端杠杆。粒度不高于 day，绝不伪造精度。
-    "content_timestamp_prefix": False,
+    # 转成日期”，而 Search 只把 content 喂给答案模型。端到端（DeepSeek 官网
+    # flash+pro，297 项）实测 0.6229 vs 基线 0.5724（+0.0505），时间类
+    # 问题（cat1 +0.116 / cat2 +0.271）大幅提升。粒度不高于 day，绝不伪造精度。
+    "content_timestamp_prefix": True,
 }
 
 

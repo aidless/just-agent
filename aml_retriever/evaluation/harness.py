@@ -34,8 +34,13 @@ _L7 = {**_L5, "vector": True}                 # 可选向量路（依赖不可�
 _L8 = {**_L5, "supersession": True}           # 候选组：成对覆写检测
 _L9 = {**_L8, "supersession_update_guard": True}  # v1.1 默认：覆写 + 更新保护
 _L10 = {**_L9, "preference_role_boost": True}     # 候选：再加用户偏好证据
+# v1.2 默认（L11）：L9 + 时间兜底 + 内容时间戳前缀。
+# 证据：temporal_fallback locomo R@20 +0.006 / 端到端 +0.0034；
+# content_timestamp_prefix 端到端 +0.0505（时间类问题 cat1 +0.116 / cat2 +0.271）。
+_L11 = {**_L9, "temporal_fallback": True, "content_timestamp_prefix": True}
 
-# L0→L5 是 v1.0 累进主线；v1.1 在 L5 上加入受保护覆写形成 L9。
+# L0→L5 是 v1.0 累进主线；v1.1 在 L5 上加入受保护覆写形成 L9；
+# v1.2 在 L9 上启用时间兜底与内容时间戳前缀形成 L11（当前生产默认）。
 # L6/L8 是**对照组而非推荐档**：它们分别量化负增益与未受保护的安全代价。
 ABLATION_LADDER: list[tuple[str, dict]] = [
     ("L0_lexical_baseline",     {**_OFF, "use_options": True}),
@@ -49,14 +54,15 @@ ABLATION_LADDER: list[tuple[str, dict]] = [
     ("L8_supersession_ctrl",    _L8),
     ("L9_guarded_supersession", _L9),
     ("L10_preference_ctrl",     _L10),
+    ("L11_v12_production",      _L11),
 ]
 
 # 主线档位（累进），对照组不参与「只增不减」检查
 MAINLINE_STAGES = ("L0_lexical_baseline", "L1_plus_views", "L2_plus_exact",
                    "L3_plus_context", "L4_plus_dedup", "L5_plus_weighted_rrf",
-                   "L9_guarded_supersession")
+                   "L9_guarded_supersession", "L11_v12_production")
 # 生产默认配置对应的档位名，供报告标注
-PRODUCTION_STAGE = "L9_guarded_supersession"
+PRODUCTION_STAGE = "L11_v12_production"
 # v1.1 生产档的直接对照组：原 v1.0 默认 L5。L6/L8 继续分别保留为
 # 时间意图放大负对照与无保护覆写安全对照，但不再承担“生产基线”角色。
 CONTROL_STAGE = "L5_plus_weighted_rrf"

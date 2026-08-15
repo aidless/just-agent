@@ -7,6 +7,13 @@ from aml_retriever.config import RetrieverConfig
 from aml_retriever.retriever import RetrieverDB
 
 
+def _raw_content(s: str) -> str:
+    """去掉 v1.2 内容时间戳前缀（[<时间>] 前缀），返回原始证据文本。"""
+    if s.startswith("[") and "] " in s[:64]:
+        return s[s.index("] ") + 2:]
+    return s
+
+
 class EngineCase(unittest.TestCase):
     def setUp(self):
         fd, self.path = tempfile.mkstemp(suffix=".db")
@@ -252,7 +259,8 @@ class TestTemporalRanking(EngineCase):
                 {"role": "user", "content": "猎户座预算口径说明已经整理完成。", "timestamp": 1_600_000_120_000},
             ])
             results = db.search(user_id="u1", query="猎户座目前的预算口径是多少？", top_k=20)
-            by_content = {e.content: e.evidence_flags for e in results.results if e.view == "message"}
+            by_content = {_raw_content(e.content): e.evidence_flags
+                          for e in results.results if e.view == "message"}
             update_flags = by_content["猎户座预算口径已更新为 200 元，旧的 100 元作废。"]
             noise_flags = by_content["猎户座预算口径说明已经整理完成。"]
             self.assertIn("supersedes_earlier", update_flags)
@@ -276,7 +284,8 @@ class TestTemporalRanking(EngineCase):
                 {"role": "user", "content": "林岚更喜欢用 Grellet 做样本抽检。", "timestamp": 1_600_000_120_000},
             ])
             results = db.search(user_id="u1", query="我做样本抽检时更喜欢用什么工具？", top_k=20)
-            by_content = {e.content: e.evidence_flags for e in results.results if e.view == "message"}
+            by_content = {_raw_content(e.content): e.evidence_flags
+                          for e in results.results if e.view == "message"}
             self.assertIn("direct_user_preference", by_content["我更喜欢用潮汐板做样本抽检。"])
             self.assertNotIn("direct_user_preference", by_content["你也许会喜欢用轴心面板做样本抽检。"])
             self.assertNotIn("direct_user_preference", by_content["林岚更喜欢用 Grellet 做样本抽检。"])
