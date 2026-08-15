@@ -52,6 +52,7 @@
     "supersession_update_guard": true,
     "preference_role_boost": false,
     "temporal_fallback": true,
-    "content_timestamp_prefix": true
+    "content_timestamp_prefix": true,
+    "content_timestamp_prefix_unconditional": false
   }
 }

@@ -18,12 +18,13 @@ It does not generate final answers.
 | Text Memory · Open-source / Academic Methods, first public snapshot | `FlowGrid_AML_Retriever` | **#8** | **43.98** | v1.0 |
 
 The top score in that snapshot was 45.06, a difference of 1.08 points. The
-current repository is v1.2.0. Compared with v1.1 it adds two guarded,
-evidence-backed ranking/content changes on top of the same deterministic core:
-temporal fallback for messages without timestamps, and a day-level event-time
-prefix on returned evidence (see [docs/EVAL.md](docs/EVAL.md)). These changes
-have local synthetic, retrieval-proxy, and end-to-end evidence but have not been
-assigned a new official score.
+current repository is v1.2.1. Compared with v1.1 it adds guarded,
+evidence-backed changes on top of the same deterministic core: temporal
+fallback for messages without timestamps, and a day-level event-time prefix on
+returned evidence that is applied only when the query has temporal context
+(see [docs/EVAL.md](docs/EVAL.md)). These changes have local synthetic,
+retrieval-proxy, and end-to-end evidence but have not been assigned a new
+official score.
 
 ## What it does
 
@@ -38,8 +39,9 @@ assigned a new official score.
   remains stored and retrievable.
 - Falls back to content/anchor-derived event times when a message has no
   timestamp (`temporal_fallback`), and prefixes returned evidence with a
-  day-level event date (`content_timestamp_prefix`) so the answer model can use
-  it on temporal questions without altering stored text.
+  day-level event date when the query has temporal context
+  (`content_timestamp_prefix`, gated by `has_temporal_context`) so the answer
+  model can use it on temporal questions without altering stored text.
 - Runs with Python's standard library and SQLite FTS5, with no third-party
   Python package in the default path.
 
@@ -215,13 +217,16 @@ substitute for the official leaderboard score.
 | v1.2 production (`L11_v12_production`) | 0.9983 (0.9948–1.0000) | 1.0000 | 0.7785 (0.7427–0.8020) |
 
 The v1.2 default adds `temporal_fallback` and `content_timestamp_prefix` on top
-of v1.1: Recall@20 is preserved across all three seeds while MRR improves on
-each seed. On real LoCoMo-style data (locomo10.json, 1977 queries, `top_k=100`)
-the v1.2 default raises Recall@20 from 0.8958 to 0.9014, Recall@100 from 0.9540
-to 0.9580, and MRR from 0.6186 to 0.6203. An end-to-end local reproduction
-(DeepSeek official `deepseek-v4-flash` answers judged by `deepseek-v4-pro`,
-297-item stratified sample) scores 0.6229 vs 0.5724 for the v1.1 default, with
-the gain concentrated on temporal questions. These are development evidence;
+of v1.1 (the prefix is gated by query temporal context since v1.2.1): Recall@20
+is preserved across all three seeds while MRR improves on each seed. On real
+LoCoMo-style data (locomo10.json, 1977 queries, `top_k=100`) the v1.2 default
+raises Recall@20 from 0.8958 to 0.9014, Recall@100 from 0.9540 to 0.9580, and
+MRR from 0.6186 to 0.6203. An end-to-end local reproduction (DeepSeek official
+`deepseek-v4-flash` answers judged by `deepseek-v4-pro`, 297-item stratified
+sample) scores 0.6229 vs 0.5724 for the v1.1 default; the query-gated variant
+(v1.2.1) is neutral-to-positive overall (+1.35 pp paired) and removes the
+non-temporal regression (multi-hop category +0.06). These are development
+evidence;
 only an official run can establish a new official score.
 
 Reproduce a run with:
