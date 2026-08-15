@@ -61,6 +61,9 @@ DEFAULT_FLAGS: dict[str, bool] = {
     # 默认关闭；后端不可用/超时自动回退纯确定性路径。仅存 message/view ID，
     # 按 user_id 隔离，绝不把不同用户的向量合并进共享候选池。
     "dense": False,
+    # 稠密索引是否包含聚合视图（默认 False：只嵌原始消息，视图内容蕴含在
+    # 消息里，嵌入长拼接视图会显著拖慢 Add）。只影响索引内容，不影响语义。
+    "dense_index_views": False,
     # 优化（消融中）：返回 content 前给证据加 [事件时间] 前缀（日期级，不改
     # 原文、不改排序）。官方答案指令允许“memory timestamp 明确时把相对时间
     # 转成日期”，而 Search 只把 content 喂给答案模型，故该前缀是时间类问题

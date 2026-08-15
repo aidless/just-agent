@@ -476,7 +476,11 @@ class RetrieverDB:
             view_docs = self._rebuild_incremental_views(
                 con, user_id, session_id, old_count, new_count, touched_segments
             )
-            dense_docs.extend(view_docs)
+            # 稠密索引默认只嵌入原始消息：视图是派生的（segment 可含 12 条消息
+            # 的长拼接），其内容全部蕴含在消息里，嵌入它们会显著拖慢 Add 且
+            # 收益边际。需要时用 dense_index_views 打开。
+            if self.flags.get("dense_index_views", False):
+                dense_docs.extend(view_docs)
 
         return (AddResult(
             request_id=request_id,

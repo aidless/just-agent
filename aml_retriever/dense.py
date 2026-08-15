@@ -41,7 +41,8 @@ def backend_available() -> tuple[bool, str]:
             from fastembed import TextEmbedding  # noqa: PLC0415
 
             model = os.environ.get("AML_DENSE_MODEL", DENSE_MODEL_DEFAULT)
-            _embedder = TextEmbedding(model_name=model)
+            threads = int(os.environ.get("AML_DENSE_THREADS", "4") or "4")
+            _embedder = TextEmbedding(model_name=model, threads=threads)
             return True, ""
         except Exception as exc:  # 网络失败 / 模型损坏 / 依赖缺失
             _embedder_error = f"dense backend unavailable: {exc}"

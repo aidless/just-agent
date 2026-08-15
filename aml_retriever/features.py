@@ -27,20 +27,12 @@ _STOP = {
     "what", "which", "who", "when", "where", "how", "did", "do", "does", "his",
     "her", "their", "they", "he", "she", "you", "i", "we", "best", "matches",
     "answer", "question", "memory",
-    # 扩充英文停用词（2026-08-15 消融）：代词/助动词/介词等高频噪音词。
-    # 实测效果：阻止 FTS5 OR 命中“my/your…”类弱匹配把无关消息拉进候选，
-    # 也阻止 coverage 特征因共享一个常见词而虚高。
+    # 扩充英文停用词（2026-08-15 消融，最终档）：仅纯人称/物主代词。
+    # 实测：加上助动词（have/would/can 等）会导致 locomo R@100 −0.004~−0.007
+    # 回归（这些词在完成时/情态查询里有语义）；仅代词档仍待全量确认，
+    # 若无增益则整体回退到 v1.1 原始表。
     "me", "us", "him", "them", "its", "my", "your", "our", "their", "mine",
     "yours", "ours", "hers", "theirs", "myself", "yourself", "ourselves",
-    "am", "have", "has", "had", "having", "doing", "would", "could", "should",
-    "will", "shall", "may", "might", "must", "can", "not", "no", "nor",
-    "but", "if", "than", "so", "too", "very", "just", "also", "there", "here",
-    "then", "such", "only", "some", "any", "all", "each", "every",
-    "both", "few", "more", "most", "other", "another", "own", "same",
-    "about", "above", "after", "again", "against", "before", "between",
-    "below", "down", "during", "into", "out", "over", "through", "under",
-    "up", "upon", "while", "within", "without", "off", "per", "via",
-    "get", "got",
     "\u7684", "\u4e86", "\u662f", "\u5728", "\u548c", "\u6709", "\u4ec0\u4e48",
 }
 
