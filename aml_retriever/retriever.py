@@ -30,6 +30,11 @@ from datetime import datetime, timezone
 
 from . import features
 from .config import RetrieverConfig
+from .entity_disambiguate import apply_entity_boost_v2
+from .temporal_fallback import (
+    TimeConfidence, confidence_to_recency_weight, extract_partial_month_day,
+    has_temporal_expression, parse_absolute_temporal, resolve_stored_month_day, resolve_temporal,
+)
 from .views import (
     affected_window_starts,
     join_content,
@@ -196,6 +201,13 @@ class RetrieverDB:
                     role TEXT,
                     content TEXT NOT NULL,
                     ts_ms INTEGER,
+                    abs_epoch REAL,
+                    abs_granularity TEXT,
+                    abs_expression TEXT,
+                    partial_month INTEGER,
+                    partial_day INTEGER,
+                    partial_expression TEXT,
+                    has_temporal_expr INTEGER,
                     created_at TEXT NOT NULL,
                     request_id TEXT,
                     added_at TEXT NOT NULL
@@ -245,6 +257,19 @@ class RetrieverDB:
                 );
                 """
             )
+            # 兼容已有库：SQLite 没有 ADD COLUMN IF NOT EXISTS，故按 schema 自检后迁移。
+            existing = {row["name"] for row in con.execute("PRAGMA table_info(messages)").fetchall()}
+            for column, ddl in (
+                ("abs_epoch", "REAL"),
+                ("abs_granularity", "TEXT"),
+                ("abs_expression", "TEXT"),
+                ("partial_month", "INTEGER"),
+                ("partial_day", "INTEGER"),
+                ("partial_expression", "TEXT"),
+                ("has_temporal_expr", "INTEGER"),
+            ):
+                if column not in existing:
+                    con.execute(f"ALTER TABLE messages ADD COLUMN {column} {ddl}")
 
         self._write(_do)
 
@@ -277,7 +302,21 @@ class RetrieverDB:
                     ts = int(ts)
                 except (TypeError, ValueError):
                     raise ValueError("timestamp must be an integer (unix milliseconds)")
-            normalized.append({"role": item.get("role") or "", "content": content, "ts_ms": ts})
+            # P1：仅对缺失原始 timestamp 的消息做一次绝对日期解析；该结果随内容
+            # 一起持久化，后续 Search 不再重复扫描相同正文。
+            absolute = parse_absolute_temporal(content) if ts is None else None
+            partial = extract_partial_month_day(content) if ts is None and absolute is None else None
+            normalized.append({
+                "role": item.get("role") or "", "content": content, "ts_ms": ts,
+                "abs_epoch": absolute.epoch if absolute else None,
+                "abs_granularity": absolute.granularity if absolute else None,
+                "abs_expression": absolute.original_expression if absolute else None,
+                "partial_month": partial[0] if partial else None,
+                "partial_day": partial[1] if partial else None,
+                "partial_expression": partial[2] if partial else None,
+                # 旧迁移数据为 NULL；Search 会保守地将 NULL 当作“尚未预筛”。
+                "has_temporal_expr": int(has_temporal_expression(content)) if ts is None and absolute is None and partial is None else 0,
+            })
 
         return self._write(self._add_locked, request_id, user_id, session_id, normalized)
 
@@ -318,10 +357,12 @@ class RetrieverDB:
             created_at = _iso_from_ms(item["ts_ms"]) or now
             con.execute(
                 "INSERT OR REPLACE INTO messages"
-                "(id,user_id,session_id,seq,role,content,ts_ms,created_at,request_id,added_at) "
-                "VALUES(?,?,?,?,?,?,?,?,?,?)",
+                "(id,user_id,session_id,seq,role,content,ts_ms,abs_epoch,abs_granularity,abs_expression,partial_month,partial_day,partial_expression,has_temporal_expr,created_at,request_id,added_at) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (mid, user_id, session_id, seq, item["role"], item["content"],
-                 item["ts_ms"], created_at, request_id, now),
+                 item["ts_ms"], item["abs_epoch"], item["abs_granularity"], item["abs_expression"],
+                 item["partial_month"], item["partial_day"], item["partial_expression"], item["has_temporal_expr"],
+                 created_at, request_id, now),
             )
             self._index_doc(con, mid, user_id, "message", item["content"])
             new_ids.append(mid)
@@ -523,6 +564,18 @@ class RetrieverDB:
             return SearchResult(request_id=request_id, total=0, results=[])
 
         scored = self._score(records, query, tokens, rank_map)
+
+        # vNext：实体消歧后的软重排必须发生在 RRF 融合前，
+        # 这样 feature 路的排序会反映其增益；它从不删除任何候选。
+        if self.flags.get("entity_boost_v2", False):
+            scored = apply_entity_boost_v2(
+                scored,
+                query=query,
+                base_weight=float(getattr(self.config, "entity_disambiguation_weight", 35.0)),
+                cooccurrence_weight=float(getattr(self.config, "entity_cooccurrence_weight", 20.0)),
+                config=self.config,
+            )
+
         ordered = self._fuse_and_order(scored, fts_order)
         if self.flags.get("dedup", True):
             ordered = self._dedup(ordered)
@@ -553,7 +606,7 @@ class RetrieverDB:
             part = msg_ids[i : i + chunk]
             ph = ",".join("?" * len(part))
             for r in con.execute(
-                f"SELECT id, 'message' AS view, role, content, created_at, ts_ms, session_id, seq "
+                f"SELECT id, 'message' AS view, role, content, created_at, ts_ms, abs_epoch, abs_granularity, abs_expression, partial_month, partial_day, partial_expression, has_temporal_expr, session_id, seq "
                 f"FROM messages WHERE id IN ({ph}) AND user_id=?",
                 (*part, user_id),
             ).fetchall():
@@ -565,7 +618,9 @@ class RetrieverDB:
             ph = ",".join("?" * len(part))
             for r in con.execute(
                 f"SELECT view_id AS id, view_type AS view, NULL AS role, content, created_at, "
-                f"session_id, start_seq AS seq, source_ids, NULL AS ts_ms "
+                f"session_id, start_seq AS seq, source_ids, NULL AS ts_ms, NULL AS abs_epoch, "
+                f"NULL AS abs_granularity, NULL AS abs_expression, NULL AS partial_month, "
+                f"NULL AS partial_day, NULL AS partial_expression, NULL AS has_temporal_expr "
                 f"FROM views WHERE view_id IN ({ph}) AND user_id=?",
                 (*part, user_id),
             ).fetchall():
@@ -606,6 +661,11 @@ class RetrieverDB:
             if temporal_intent
             else float(getattr(self.config, "recency_weight", W_RECENCY))
         )
+        # vNext：仅在开关打开时用分级时间解析给每条候选附加事件时间。
+        # 关闭时保持原有 _epoch_of(ts_ms → created_at) 行为，便于消融比较。
+        if self.flags.get("temporal_fallback", False):
+            self._annotate_temporal(records, rank_map, query)
+
         stamps = [self._epoch_of(rec) for rec in records]
         known = [s for s in stamps if s is not None]
         ts_min = min(known) if known else None
@@ -665,10 +725,24 @@ class RetrieverDB:
                         relative = (epoch - ts_min) / ts_span
                     else:
                         relative = 1.0
-                    score += recency_weight * relative
+                    effective_recency_weight = recency_weight
+                    if self.flags.get("temporal_fallback", False):
+                        confidence = rec.get("_temporal_confidence")
+                        if confidence is not None:
+                            effective_recency_weight = confidence_to_recency_weight(
+                                recency_weight, confidence
+                            )
+                        source = rec.get("_temporal_source", "legacy")
+                        confidence_name = getattr(confidence, "name", "UNKNOWN").lower()
+                        flags.append(f"temporal:{source}:{confidence_name}")
+                    score += effective_recency_weight * relative
                     flags.append("recency_intent" if temporal_intent else "recency")
+                elif self.flags.get("temporal_fallback", False):
+                    # 已启用新兜底但仍无可排序的时间信息：显式不加新近度，
+                    # 防止把不确定记忆伪装成“较新”。
+                    flags.append("temporal:unknown:no_recency_boost")
                 elif self._age_days(rec.get("created_at"), now_ts) is not None:
-                    # 极端兜底：没有可用时间戳时退回绝对年龄的弱信号
+                    # 旧行为：仅在 vNext 时间兜底关闭时保留 created_at 弱信号。
                     age_days = self._age_days(rec.get("created_at"), now_ts)
                     score += W_RECENCY / (1.0 + math.log1p(max(0.0, age_days)))
                     flags.append("recency")
@@ -704,6 +778,99 @@ class RetrieverDB:
             )
         return records
 
+    def _annotate_temporal(self, records: list[dict], rank_map: dict[str, float] | None = None, query: str = "") -> None:
+        """为候选附加分级时间结果，不改写数据库原始字段。
+
+        先按 (session_id, seq) 建立会话锚点：有原始 ts_ms 或正文绝对日期的
+        消息会更新锚点；后续“昨天 / 三天前 / 下周”等相对表达据此推算。
+        created_at 只作为 LOW 级最后兜底，因此永远不会替代显式事件时间。
+        """
+        anchors: dict[object, float] = {}
+        # P2：预筛字段先排除确定“不含相对/模糊时间”的新消息；旧消息（NULL）保守保留。
+        # 再按 query 类型给解析预算：日期问题 > 当前状态问题 > 普通问题。
+        if features.has_date_value_intent(query):
+            limit = max(0, int(getattr(self.config, "temporal_fallback_top_n", 80)))
+        elif features.has_temporal_intent(query):
+            limit = max(0, int(getattr(self.config, "temporal_fallback_top_n_temporal", 40)))
+        else:
+            limit = max(0, int(getattr(self.config, "temporal_fallback_top_n_other", 8)))
+        unresolved_all = [r for r in records if r.get("ts_ms") is None and r.get("abs_epoch") is None and r.get("partial_month") is None]
+        prefilter_ids = {r.get("id") for r in unresolved_all if r.get("has_temporal_expr") == 0}
+        unresolved = [r for r in unresolved_all if r.get("id") not in prefilter_ids]
+        unresolved.sort(key=lambda r: (abs(float((rank_map or {}).get(r.get("id"), 1e18))), r.get("id", "")))
+        deferred_ids = {r.get("id") for r in unresolved[limit:]} if limit else set()
+        ordered = sorted(
+            records,
+            key=lambda r: (str(r.get("session_id") or ""), int(r.get("seq") or 0), r.get("id", "")),
+        )
+        for rec in ordered:
+            session_key = rec.get("session_id")
+            ts_ms = rec.get("ts_ms")
+            # 热路径：大多数生产消息已有 ts_ms；避免为它们构造结果对象、扫描正则
+            # 或解析 created_at。只有真正缺少原始时间戳的候选才进入完整兜底。
+            if ts_ms is not None:
+                try:
+                    epoch = float(ts_ms) / 1000.0
+                    rec["_temporal_epoch"] = epoch
+                    rec["_temporal_confidence"] = TimeConfidence.HIGH
+                    rec["_temporal_source"] = "ts_ms"
+                    rec["_temporal_granularity"] = "millisecond"
+                    rec["_temporal_expression"] = str(ts_ms)
+                    anchors[session_key] = epoch
+                    continue
+                except (TypeError, ValueError):
+                    pass
+            # P1：绝对日期已在 Add 阶段提取并持久化，不再扫描 content。
+            if rec.get("abs_epoch") is not None:
+                rec["_temporal_epoch"] = float(rec["abs_epoch"])
+                rec["_temporal_confidence"] = TimeConfidence.HIGH
+                rec["_temporal_source"] = "stored_content_absolute"
+                rec["_temporal_granularity"] = rec.get("abs_granularity") or "day"
+                rec["_temporal_expression"] = rec.get("abs_expression") or ""
+                anchors[session_key] = float(rec["abs_epoch"])
+                continue
+            # 月日无年份已在 Add 持久化；只依赖当前会话锚点的纯函数已按锚点日缓存。
+            partial = resolve_stored_month_day(
+                rec.get("partial_month"), rec.get("partial_day"), anchors.get(session_key)
+            )
+            if partial is not None:
+                rec["_temporal_epoch"] = partial.epoch
+                rec["_temporal_confidence"] = partial.confidence
+                rec["_temporal_source"] = partial.source
+                rec["_temporal_granularity"] = partial.granularity
+                rec["_temporal_expression"] = rec.get("partial_expression") or partial.original_expression
+                anchors[session_key] = partial.epoch
+                continue
+            if rec.get("id") in prefilter_ids:
+                rec["_temporal_epoch"] = None
+                rec["_temporal_confidence"] = TimeConfidence.UNKNOWN
+                rec["_temporal_source"] = "prefilter_no_time_expression"
+                rec["_temporal_granularity"] = "unknown"
+                rec["_temporal_expression"] = ""
+                continue
+            if rec.get("id") in deferred_ids:
+                rec["_temporal_epoch"] = None
+                rec["_temporal_confidence"] = TimeConfidence.UNKNOWN
+                rec["_temporal_source"] = "deferred_top_n"
+                rec["_temporal_granularity"] = "unknown"
+                rec["_temporal_expression"] = ""
+                continue
+            result = resolve_temporal(
+                ts_ms=None,
+                content=rec.get("content") or "",
+                created_at=rec.get("created_at"),
+                session_anchor_epoch=anchors.get(session_key),
+            )
+            rec["_temporal_epoch"] = result.epoch
+            rec["_temporal_confidence"] = result.confidence
+            rec["_temporal_source"] = result.source
+            rec["_temporal_granularity"] = result.granularity
+            rec["_temporal_expression"] = result.original_expression
+            # 只让 HIGH/MEDIUM 级事件时间成为下一条消息的会话锚点，
+            # 防止 created_at 或插值结果累积放大误差。
+            if result.epoch is not None and result.confidence.name in {"HIGH", "MEDIUM"}:
+                anchors[session_key] = result.epoch
+
     @staticmethod
     def _epoch_of(rec: dict) -> float | None:
         """候选记录的事件时间（秒）。优先原始 ts_ms，其次解析 created_at。
@@ -711,6 +878,8 @@ class RetrieverDB:
         聚合视图的 created_at 取自其首条源消息，因此与原始消息在同一时间轴上，
         可以直接参与相对新近度归一。
         """
+        if "_temporal_epoch" in rec:
+            return rec.get("_temporal_epoch")
         ts_ms = rec.get("ts_ms")
         if ts_ms is not None:
             try:

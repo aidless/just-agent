@@ -49,6 +49,11 @@ DEFAULT_FLAGS: dict[str, bool] = {
     # 个性化证据来源：偏好类查询中，轻度抬高用户本人直接陈述，绝不删除
     # assistant 转述或其他原始证据。代理集虽显示正收益，但场景宽度仍不足，默认关闭。
     "preference_role_boost": False,
+    # vNext：实体消歧后的软提升。默认关闭，先通过离线消融确认净收益。
+    "entity_boost_v2": False,
+    # vNext：当 ts_ms 缺失时，按正文时间表达／会话锚点／created_at 逐层兜底。
+    # 默认关闭，避免改变现有新近度语义。
+    "temporal_fallback": False,
 }
 
 
@@ -99,6 +104,16 @@ class RetrieverConfig:
     # 只改变排序，不过滤任何候选，且在 RRF 前进入特征路排序。
     preference_role_weight: float = 14.0
 
+    # vNext：实体消歧后的软提升。仅在 flags["entity_boost_v2"] 开启时生效。
+    entity_disambiguation_weight: float = 35.0
+    entity_cooccurrence_weight: float = 20.0
+
+    # vNext P2：仅对基础特征排名靠前的无 ts_ms 候选执行完整相对时间兜底。
+    # 0 表示不限制；默认 80，保持候选覆盖同时控制 Search 热路径成本。
+    temporal_fallback_top_n: int = 80  # 兼容旧配置：日期值查询的默认上限
+    temporal_fallback_top_n_temporal: int = 40  # “当前/最新”但未必索要日期
+    temporal_fallback_top_n_other: int = 8      # 普通查询仅保留极小的安全预算
+
     # 一致性 / 并发
     busy_timeout_ms: int = 10000
     write_retries: int = 5
@@ -138,6 +153,11 @@ class RetrieverConfig:
             "AML_RRF_W_LEXICAL": ("rrf_weight_lexical", float),
             "AML_RECENCY_W": ("recency_weight", float),
             "AML_RECENCY_W_INTENT": ("recency_weight_intent", float),
+            "AML_ENTITY_DISAMBIGUATION_W": ("entity_disambiguation_weight", float),
+            "AML_ENTITY_COOCCURRENCE_W": ("entity_cooccurrence_weight", float),
+            "AML_TEMPORAL_FALLBACK_TOP_N": ("temporal_fallback_top_n", int),
+            "AML_TEMPORAL_FALLBACK_TOP_N_TEMPORAL": ("temporal_fallback_top_n_temporal", int),
+            "AML_TEMPORAL_FALLBACK_TOP_N_OTHER": ("temporal_fallback_top_n_other", int),
             "AML_HOST": ("host", str),
             "AML_PORT": ("port", int),
             "AML_AUTH_MODE": ("auth_mode", str),

@@ -1,0 +1,52 @@
+# FlowGrid SQLite WAL：同机高并发读 + 单写者队列配置
+# 适用：单主机、本地 SSD、SQLite WAL；不适用于 NFS/网络文件系统或多主机共享 .db。
+
+[database]
+path = "./data/flowgrid.db"
+# 读连接总上限应覆盖 HTTP Search worker，不应无限增大。
+reader_pool_size = 48
+# 只保留一条写连接；多个 HTTP writer 必须通过队列汇聚。
+writer_connections = 1
+busy_timeout_ms = 10000
+
+[writer_queue]
+# 写 API 先入有界队列。满时返回 429/503 或降级为异步 202，禁止无限内存排队。
+max_items = 10000
+batch_max_items = 128
+batch_max_wait_ms = 75
+# 同一 (user_id, scope) 的连续 mutation 在批内合并缓存失效通知，审计事件仍逐条写入。
+coalesce_invalidation_ms = 250
+
+[sqlite_pragma]
+journal_mode = "WAL"
+# NORMAL 降低 fsync 开销；若每次提交必须抗断电持久，则改为 FULL 并重新压测。
+synchronous = "NORMAL"
+temp_store = "MEMORY"
+cache_size_kib = 65536
+mmap_size_bytes = 268435456
+wal_autocheckpoint_pages = 0
+journal_size_limit_bytes = 67108864
+foreign_keys = true
+
+[checkpoint]
+# 业务线程不执行 FULL/RESTART/TRUNCATE checkpoint；由独立低优先级 worker 做 PASSIVE。
+mode = "PASSIVE"
+interval_seconds = 15
+trigger_wal_pages = 4000
+# 有长期 read transaction 时 PASSIVE 可能只部分完成，应记录 busy/log/checkpointed。
+max_busy_cycles_before_alert = 8
+
+[cache]
+temporal_debounce_ms = 250
+max_stale_ms = 200
+ttl_seconds = 20
+ttl_jitter_ratio = 0.15
+strict_header = "X-Temporal-Consistency"
+
+[observability]
+slow_read_ms = 250
+slow_write_ms = 100
+emit_wal_size_bytes = true
+emit_queue_depth = true
+emit_checkpoint_stats = true
+emit_singleflight_waiters = true

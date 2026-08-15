@@ -1,0 +1,193 @@
+{
+  "query": "林涛确认的 Apple Q3 发布会更新后日期是什么？",
+  "messages": [
+    {
+      "role": "user",
+      "timestamp": 1786665600000,
+      "content": "今天是 2026-08-14。Apple Q3 发布会原定日期是 2026-08-21。"
+    },
+    {
+      "role": "user",
+      "content": "三天前，林涛确认 Apple Q3 发布会更新后的日期是 8月28日。"
+    },
+    {
+      "role": "user",
+      "timestamp": 1787184000000,
+      "content": "Q3 财务审计材料今天送审，和 Apple 发布会日期无关。"
+    },
+    {
+      "role": "user",
+      "timestamp": 1787356800000,
+      "content": "苹果水果采购预算已更新，供应商将于 2026-08-25 交付。"
+    }
+  ],
+  "baseline": [
+    {
+      "id": "m_0d90aa01b80073eb",
+      "rank": 1,
+      "content": "三天前，林涛确认 Apple Q3 发布会更新后的日期是 8月28日。",
+      "feature_score": 142.6613,
+      "post_entity_score": 142.6613,
+      "rrf_score": 0.018033,
+      "temporal_source": "legacy",
+      "temporal_confidence": "N/A",
+      "temporal_granularity": "N/A",
+      "flags": [
+        "lexical",
+        "high_coverage",
+        "entity",
+        "number",
+        "adjacent_evidence",
+        "recency",
+        "possible_conflict",
+        "latest_state",
+        "rrf"
+      ]
+    },
+    {
+      "id": "m_6ec58e13e4b3fc05",
+      "rank": 2,
+      "content": "Q3 财务审计材料今天送审，和 Apple 发布会日期无关。",
+      "feature_score": 108.4286,
+      "post_entity_score": 108.4286,
+      "rrf_score": 0.017716,
+      "temporal_source": "legacy",
+      "temporal_confidence": "N/A",
+      "temporal_granularity": "N/A",
+      "flags": [
+        "lexical",
+        "entity",
+        "number",
+        "adjacent_evidence",
+        "recency",
+        "rrf"
+      ]
+    },
+    {
+      "id": "m_75be17bd185ca1c4",
+      "rank": 3,
+      "content": "今天是 2026-08-14。Apple Q3 发布会原定日期是 2026-08-21。",
+      "feature_score": 104.3333,
+      "post_entity_score": 104.3333,
+      "rrf_score": 0.017486,
+      "temporal_source": "legacy",
+      "temporal_confidence": "N/A",
+      "temporal_granularity": "N/A",
+      "flags": [
+        "lexical",
+        "entity",
+        "number",
+        "adjacent_evidence",
+        "recency",
+        "possible_conflict",
+        "rrf"
+      ]
+    },
+    {
+      "id": "m_9dee7d769a0a716d",
+      "rank": 4,
+      "content": "苹果水果采购预算已更新，供应商将于 2026-08-25 交付。",
+      "feature_score": 28.8571,
+      "post_entity_score": 28.8571,
+      "rrf_score": 0.017188,
+      "temporal_source": "legacy",
+      "temporal_confidence": "N/A",
+      "temporal_granularity": "N/A",
+      "flags": [
+        "lexical",
+        "entity",
+        "adjacent_evidence",
+        "recency",
+        "rrf"
+      ]
+    }
+  ],
+  "vnext": [
+    {
+      "id": "m_0d90aa01b80073eb",
+      "rank": 1,
+      "content": "三天前，林涛确认 Apple Q3 发布会更新后的日期是 8月28日。",
+      "feature_score": 147.0762,
+      "post_entity_score": 285.4095,
+      "rrf_score": 0.018033,
+      "temporal_source": "stored_month_day_anchor",
+      "temporal_confidence": "MEDIUM",
+      "temporal_granularity": "day",
+      "flags": [
+        "lexical",
+        "high_coverage",
+        "entity",
+        "number",
+        "adjacent_evidence",
+        "temporal:stored_month_day_anchor:medium",
+        "recency",
+        "possible_conflict",
+        "latest_state",
+        "entity_boost_v2:[Apple(1.0),会更新后(1.0),发布会更(1.0)]",
+        "rrf"
+      ]
+    },
+    {
+      "id": "m_6ec58e13e4b3fc05",
+      "rank": 2,
+      "content": "Q3 财务审计材料今天送审，和 Apple 发布会日期无关。",
+      "feature_score": 105.8572,
+      "post_entity_score": 195.8572,
+      "rrf_score": 0.017716,
+      "temporal_source": "ts_ms",
+      "temporal_confidence": "HIGH",
+      "temporal_granularity": "millisecond",
+      "flags": [
+        "lexical",
+        "entity",
+        "number",
+        "adjacent_evidence",
+        "temporal:ts_ms:high",
+        "recency",
+        "entity_boost_v2:[Apple(1.0),发布会(1.0)]",
+        "rrf"
+      ]
+    },
+    {
+      "id": "m_75be17bd185ca1c4",
+      "rank": 3,
+      "content": "今天是 2026-08-14。Apple Q3 发布会原定日期是 2026-08-21。",
+      "feature_score": 104.3333,
+      "post_entity_score": 194.3333,
+      "rrf_score": 0.017486,
+      "temporal_source": "ts_ms",
+      "temporal_confidence": "HIGH",
+      "temporal_granularity": "millisecond",
+      "flags": [
+        "lexical",
+        "entity",
+        "number",
+        "adjacent_evidence",
+        "temporal:ts_ms:high",
+        "recency",
+        "possible_conflict",
+        "entity_boost_v2:[Apple(1.0),发布会(1.0)]",
+        "rrf"
+      ]
+    },
+    {
+      "id": "m_9dee7d769a0a716d",
+      "rank": 4,
+      "content": "苹果水果采购预算已更新，供应商将于 2026-08-25 交付。",
+      "feature_score": 25.4286,
+      "post_entity_score": 25.4286,
+      "rrf_score": 0.017188,
+      "temporal_source": "ts_ms",
+      "temporal_confidence": "HIGH",
+      "temporal_granularity": "millisecond",
+      "flags": [
+        "lexical",
+        "entity",
+        "adjacent_evidence",
+        "temporal:ts_ms:high",
+        "recency",
+        "rrf"
+      ]
+    }
+  ]
+}
