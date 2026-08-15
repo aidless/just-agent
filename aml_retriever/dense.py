@@ -17,14 +17,19 @@ import os
 import sqlite3
 import threading
 
-import numpy as np
-
 DENSE_MODEL_DEFAULT = "BAAI/bge-small-en-v1.5"
 DENSE_DIM_DEFAULT = 384
 
 _embedder = None
 _embedder_lock = threading.Lock()
 _embedder_error: str | None = None
+
+
+def _np():
+    """惰性导入 numpy：保持默认路径零第三方依赖（提交镜像无 numpy）。"""
+    import numpy  # noqa: PLC0415
+
+    return numpy
 
 
 def backend_available() -> tuple[bool, str]:
@@ -38,6 +43,7 @@ def backend_available() -> tuple[bool, str]:
         if _embedder is not None:
             return True, ""
         try:
+            _np()  # numpy 缺失 → dense 不可用（回退纯确定性路径）
             from fastembed import TextEmbedding  # noqa: PLC0415
 
             model = os.environ.get("AML_DENSE_MODEL", DENSE_MODEL_DEFAULT)
@@ -49,7 +55,8 @@ def backend_available() -> tuple[bool, str]:
             return False, _embedder_error
 
 
-def embed_texts(texts: list[str]) -> np.ndarray | None:
+def embed_texts(texts: list[str]):
+    np = _np()
     ok, _ = backend_available()
     if not ok:
         return None
@@ -106,7 +113,8 @@ class DenseIndex:
 
         self.db._write(_do)
 
-    def _load(self, user_id: str) -> tuple[np.ndarray, list[str]] | None:
+    def _load(self, user_id: str):
+        np = _np()
         with self._lock:
             if user_id in self._cache:
                 return self._cache[user_id]
@@ -126,6 +134,7 @@ class DenseIndex:
 
     def top_n(self, user_id: str, query: str, n: int) -> list[tuple[str, float]]:
         """余弦相似度 Top-N（0~1 分，越大越相关）。"""
+        np = _np()
         payload = self._load(user_id)
         if payload is None:
             return []
