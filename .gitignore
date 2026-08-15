@@ -12,3 +12,5 @@ eval_out/
 # Local/editor state
 .idea/
 .vscode/
+eval_out_syn_l5l9/
+*.log

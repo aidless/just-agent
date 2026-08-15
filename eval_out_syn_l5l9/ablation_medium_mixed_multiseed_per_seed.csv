@@ -1,3 +1,0 @@
-seed,stage,skipped,recall@20,recall@100,mrr,distractor_leak@10,p50_ms,p95_ms
-20260806,L5_plus_weighted_rrf,0,1.0,1.0,0.6631,0.5312,31.05,51.02
-20260806,L9_guarded_supersession,0,1.0,1.0,0.6854,0.5312,32.135,49.409

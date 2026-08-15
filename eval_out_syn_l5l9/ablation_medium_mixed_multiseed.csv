@@ -1,3 +1,0 @@
-stage,skipped,n_seeds,recall@20_mean,recall@20_min,recall@20_max,recall@100_mean,recall@100_min,recall@100_max,mrr_mean,mrr_min,mrr_max,distractor_leak@10_mean,distractor_leak@10_min,distractor_leak@10_max,p50_ms_mean,p50_ms_min,p50_ms_max,p95_ms_mean,p95_ms_min,p95_ms_max
-L5_plus_weighted_rrf,0,1,1.0,1.0,1.0,1.0,1.0,1.0,0.6631,0.6631,0.6631,0.5312,0.5312,0.5312,31.05,31.05,31.05,51.02,51.02,51.02
-L9_guarded_supersession,0,1,1.0,1.0,1.0,1.0,1.0,1.0,0.6854,0.6854,0.6854,0.5312,0.5312,0.5312,32.135,32.135,32.135,49.409,49.409,49.409
