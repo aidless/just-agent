@@ -50,7 +50,7 @@ DEFAULT_FLAGS: dict[str, bool] = {
     # 绝不删除 assistant 转述或其他原始证据。PersonaMem-v2 检索实测：MRR
     # 0.346 → 0.607（+0.261）、R@20 +0.085（200 行样本）；locomo10 零回归
     # （0.9074/0.9565/0.6324 逐位一致）。只对 has_preference_intent 查询生效。
-    "preference_role_boost": True,
+    "preference_role_boost": False,
     # vNext：实体消歧后的软提升。默认关闭，先通过离线消融确认净收益。
     "entity_boost_v2": False,
     # 时间兜底（v1.2 默认启用）：当 ts_ms 缺失时，按正文时间表达／会话锚点／

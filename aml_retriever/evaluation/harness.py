@@ -38,13 +38,15 @@ _L10 = {**_L9, "preference_role_boost": True}     # 候选：再加用户偏好�
 # 证据：temporal_fallback locomo R@20 +0.006 / 端到端 +0.0034；
 # content_timestamp_prefix 端到端 +0.0505（时间类问题 cat1 +0.116 / cat2 +0.271）。
 _L11 = {**_L9, "temporal_fallback": True, "content_timestamp_prefix": True}
-# v1.3 默认（L12）：L11 + 偏好角色提升。证据：PersonaMem-v2 MRR +0.261 /
-# R@20 +0.085（200 行样本），locomo10 零回归（逐位一致）。
-_L12 = {**_L11, "preference_role_boost": True}
+# v1.3 默认（L12）：L11 + 代码级查询类型感知新近度（纯文本查询 2.0 而非 8.0）。
+# 证据：locomo10 全量 MRR 0.6203→0.6324（+0.0121）、合成 L9 0.6854→0.7281。
+# preference_role_boost 曾于 0eeca8b 默认启用（声称 PersonaMem MRR +0.261），
+# 后经同样本配对（50/100/200 三档逐位一致）证明为样本方差伪信号 → 已回退默认关闭。
+_L12 = {**_L11, "preference_role_boost": False}
 
 # L0→L5 是 v1.0 累进主线；v1.1 在 L5 上加入受保护覆写形成 L9；
 # v1.2 在 L9 上启用时间兜底与内容时间戳前缀形成 L11；
-# v1.3 在 L11 上启用偏好角色提升形成 L12（当前生产默认）。
+# v1.3 在 L11 上落地查询类型感知新近度形成 L12（当前生产默认，L12 与 L11 开关集相同）。
 # L6/L8 是**对照组而非推荐档**：它们分别量化负增益与未受保护的安全代价。
 ABLATION_LADDER: list[tuple[str, dict]] = [
     ("L0_lexical_baseline",     {**_OFF, "use_options": True}),

@@ -241,8 +241,9 @@ class TestTemporalRanking(EngineCase):
         self.assertLessEqual(RetrieverConfig().rrf_weight_lexical, 0.25)
         self.assertTrue(DEFAULT_FLAGS["supersession"])
         self.assertTrue(DEFAULT_FLAGS["supersession_update_guard"])
-        # v1.3：preference_role_boost 默认启用（PersonaMem-v2 MRR +0.261，locomo 零回归）
-        self.assertTrue(DEFAULT_FLAGS["preference_role_boost"])
+        # v1.3 回退：preference_role_boost 默认关闭（0eeca8b 曾启用，PersonaMem
+        # 同样本配对 50/100/200 三档逐位一致证明增益为样本方差伪信号，见 DECISIONS.md）
+        self.assertFalse(DEFAULT_FLAGS["preference_role_boost"])
         self.assertFalse(DEFAULT_FLAGS["temporal_intent"])
 
     def test_update_guard_rejects_newer_non_update_noise(self):

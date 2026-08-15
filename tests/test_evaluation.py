@@ -254,10 +254,9 @@ class TestLadderIntegrity(unittest.TestCase):
         base_v11 = {k for k, v in table["L9_guarded_supersession"].items() if v}
         self.assertEqual(preference - base_v11, {"preference_role_boost"})
         self.assertFalse(base_v11 - preference)
-        # v1.3 生产档 L12 相对 L9 = 时间兜底 + 时间戳前缀 + 偏好角色提升
+        # v1.3 生产档 L12 相对 L9 = 时间兜底 + 时间戳前缀（偏好角色提升已回退默认关闭）
         self.assertEqual(production - base_v11,
-                         {"temporal_fallback", "content_timestamp_prefix",
-                          "preference_role_boost"})
+                         {"temporal_fallback", "content_timestamp_prefix"})
         self.assertFalse(base_v11 - production)
         guarded = {k for k, v in table["L9_guarded_supersession"].items() if v}
         unguarded = {k for k, v in table["L8_supersession_ctrl"].items() if v}
