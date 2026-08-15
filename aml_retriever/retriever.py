@@ -812,10 +812,21 @@ class RetrieverDB:
         temporal_intent = (
             self.flags.get("temporal_intent", False) and features.has_temporal_intent(query)
         )
+        # v1.3：新近度权重按查询类型分档。
+        # - has_temporal_intent（现在/当前/latest 等"当前状态"标记）→ 高权重，
+        #   因为当前状态问题的答案确实是最新陈述。
+        # - 其余（含"when did X happen"历史问题、普通事实问题）→ 低权重：
+        #   BEAM 实证，多月经度对话中 recency=8 会把 2026 年的无关消息顶到
+        #   2024 年的事实答案之上（"When does my first sprint end?" 答案排 rank 11）。
+        current_state = features.has_temporal_intent(query)
         recency_weight = (
             float(getattr(self.config, "recency_weight_intent", W_RECENCY_INTENT))
             if temporal_intent
-            else float(getattr(self.config, "recency_weight", W_RECENCY))
+            else (
+                float(getattr(self.config, "recency_weight", W_RECENCY))
+                if current_state
+                else float(getattr(self.config, "recency_weight_plain", 2.0))
+            )
         )
         # vNext：仅在开关打开时用分级时间解析给每条候选附加事件时间。
         # 关闭时保持原有 _epoch_of(ts_ms → created_at) 行为，便于消融比较。

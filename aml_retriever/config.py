@@ -120,6 +120,10 @@ class RetrieverConfig:
     # intent 档仅在 flags["temporal_intent"] 开启时生效，实测收益为负，故默认不启用。
     recency_weight: float = 8.0
     recency_weight_intent: float = 12.0
+    # v1.3：非时间上下文查询的新近度权重（BEAM 实证：长对话中 recency=8 会把
+    # 无关的最新消息顶到相关旧消息之上，如 "When does my first sprint end?" 返回
+    # 一堆 Flask 无关消息；普通查询改用低权重，时间查询保持 recency_weight）。
+    recency_weight_plain: float = 2.0
 
     # 覆写检测参数（仅在 flags["supersession"] 开启时生效）。
     # min_overlap 是两条消息「谈的是同一件事」的判定阈值，按 containment
