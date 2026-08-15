@@ -18,13 +18,14 @@ It does not generate final answers.
 | Text Memory · Open-source / Academic Methods, first public snapshot | `FlowGrid_AML_Retriever` | **#8** | **43.98** | v1.0 |
 
 The top score in that snapshot was 45.06, a difference of 1.08 points. The
-current repository is v1.2.1. Compared with v1.1 it adds guarded,
+current repository is v1.3. Compared with v1.1 it adds guarded,
 evidence-backed changes on top of the same deterministic core: temporal
-fallback for messages without timestamps, and a day-level event-time prefix on
+fallback for messages without timestamps, a day-level event-time prefix on
 returned evidence that is applied only when the query has temporal context
-(see [docs/EVAL.md](docs/EVAL.md)). These changes have local synthetic,
-retrieval-proxy, and end-to-end evidence but have not been assigned a new
-official score.
+(see [docs/EVAL.md](docs/EVAL.md)), and a query-type-aware recency weight
+(plain non-temporal queries get 2.0 instead of 8.0). These changes have local
+synthetic, retrieval-proxy, and end-to-end evidence but have not been assigned
+a new official score.
 
 ## What it does
 
@@ -215,6 +216,7 @@ substitute for the official leaderboard score.
 | v1.0 baseline (`L5_plus_weighted_rrf`) | 0.9948 (0.9870–1.0000) | 1.0000 | 0.6728 (0.6631–0.6791) |
 | v1.1 guarded supersession (`L9_guarded_supersession`) | 0.9948 (0.9870–1.0000) | 1.0000 | 0.6948 (0.6854–0.7004) |
 | v1.2 production (`L11_v12_production`) | 0.9983 (0.9948–1.0000) | 1.0000 | 0.7785 (0.7427–0.8020) |
+| v1.3 production (`L12_v13_production`) | 0.9983 (0.9948–1.0000) | 1.0000 | 0.7785 (0.7427–0.8020) |
 
 The v1.2 default adds `temporal_fallback` and `content_timestamp_prefix` on top
 of v1.1 (the prefix is gated by query temporal context since v1.2.1): Recall@20
@@ -225,8 +227,16 @@ MRR from 0.6186 to 0.6203. An end-to-end local reproduction (DeepSeek official
 `deepseek-v4-flash` answers judged by `deepseek-v4-pro`, 297-item stratified
 sample) scores 0.6229 vs 0.5724 for the v1.1 default; the query-gated variant
 (v1.2.1) is neutral-to-positive overall (+1.35 pp paired) and removes the
-non-temporal regression (multi-hop category +0.06). These are development
-evidence;
+non-temporal regression (multi-hop category +0.06).
+
+v1.3 adds a **query-type-aware recency weight** at the code level (plain
+non-temporal queries use 2.0 instead of 8.0; temporal-intent queries keep 8.0):
+locomo10 MRR rises from 0.6203 to 0.6324 (R@20 0.9074 / R@100 0.9565), and the
+synthetic L9 MRR rises from 0.6854 to 0.7281 with Recall unchanged. The flag set
+is identical to v1.2.1: `preference_role_boost` was briefly enabled during v1.3
+development but reverted after paired same-sample gates (slices 50/100/200,
+bit-identical with the flag off) showed the apparent gain was sample variance.
+These are development evidence;
 only an official run can establish a new official score.
 
 Reproduce a run with:
