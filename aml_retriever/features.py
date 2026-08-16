@@ -187,6 +187,54 @@ def has_duration_intent(text: str) -> bool:
     return any(marker in lowered for marker in _DURATION_INTENT_EN)
 
 
+# 顺序/流程意图：问"先发生什么、按什么顺序、依次经历什么"
+_ORDERING_INTENT_EN = (
+    "in what order", "which order", "the order", "in order", "sequence",
+    "chronological", "chronologically", "timeline", "step by step", "steps",
+    "walk me through", "list the order", "what came first", "what came next",
+    "first,", "then,", "after that", "before that",
+)
+_ORDERING_INTENT_CN = (
+    "顺序", "先后", "依次", "按时间", "流程", "步骤", "排序", "先发生", "然后", "之后",
+    "前因后果", "时间线",
+)
+
+
+def has_ordering_intent(text: str) -> bool:
+    """判断查询是否在问事件发生的顺序/时间线。"""
+    if not text:
+        return False
+    lowered = text.lower()
+    if any(marker in text for marker in _ORDERING_INTENT_CN):
+        return True
+    return any(marker in lowered for marker in _ORDERING_INTENT_EN)
+
+
+# 建议/咨询意图（个性化建议类）：PersonaMem 式问题多为"给我建议/推荐"，
+# 与 has_preference_intent 的"直接问偏好"互补。独立函数，不改动原意图。
+_ADVICE_INTENT_EN = (
+    "what are some", "what is the best", "what's the best", "how can i",
+    "how do i", "how should i", "suggest", "recommend", "tips", "ideas",
+    "ways to", "advice", "help me", "help me with", "i'm planning",
+    "i am planning", "what should i", "options for", "guide me", "any ideas",
+    "best way to", "good way to", "i want to",
+)
+_ADVICE_INTENT_CN = (
+    "建议", "推荐", "怎么做", "怎么办", "有什么好", "帮我", "方法", "技巧",
+    "规划", "打算", "想", "适合", "选择", "方案",
+)
+
+
+def has_advice_intent(text: str) -> bool:
+    """判断查询是否在寻求建议/推荐/规划类回答。"""
+    if not text:
+        return False
+    lowered = text.lower()
+    if any(marker in text for marker in _ADVICE_INTENT_CN):
+        return True
+    return any(marker in lowered for marker in _ADVICE_INTENT_EN)
+
+
 def has_temporal_context(text: str) -> bool:
     """v1.2.1 时间前缀的统一门控：时间/日期意图、显式日期、月份名或时长意图。
 
@@ -310,4 +358,6 @@ __all__ = [
     "has_explicit_date",
     "has_duration_intent",
     "has_temporal_context",
+    "has_ordering_intent",
+    "has_advice_intent",
 ]

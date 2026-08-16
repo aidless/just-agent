@@ -44,6 +44,12 @@ _L11 = {**_L9, "temporal_fallback": True, "content_timestamp_prefix": True}
 # 后经同样本配对（50/100/200 三档逐位一致）证明为样本方差伪信号 → 已回退默认关闭。
 _L12 = {**_L11, "preference_role_boost": False}
 
+# v1.4 候选（内容塑形，默认关闭，探针/门禁见 DECISIONS.md）：
+# L13：顺序意图查询按事件时间重排 + [事件N] 序号前缀（BEAM event_ordering 探针正信号）
+# L14：时间上下文查询按事件时间升序重排（不加前缀）
+_L13 = {**_L12, "ordering_prefix": True}
+_L14 = {**_L12, "chrono_ordering": True}
+
 # L0→L5 是 v1.0 累进主线；v1.1 在 L5 上加入受保护覆写形成 L9；
 # v1.2 在 L9 上启用时间兜底与内容时间戳前缀形成 L11；
 # v1.3 在 L11 上落地查询类型感知新近度形成 L12（当前生产默认，L12 与 L11 开关集相同）。
@@ -62,6 +68,8 @@ ABLATION_LADDER: list[tuple[str, dict]] = [
     ("L10_preference_ctrl",     _L10),
     ("L11_v12_production",      _L11),
     ("L12_v13_production",      _L12),
+    ("L13_ordering_shaping",    _L13),
+    ("L14_chrono_ordering",     _L14),
 ]
 
 # 主线档位（累进），对照组不参与「只增不减」检查

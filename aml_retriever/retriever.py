@@ -681,6 +681,8 @@ class RetrieverDB:
         if self.flags.get("dedup", True):
             ordered = self._dedup(ordered)
         final = self._apply_slot_guarantee(ordered, limit)
+        # 塑形在槽位保证之后：它只重排/加前缀，不改变"哪些记录入选"
+        final = self._apply_ordering_shaping(final, query)
 
         results = [
             Evidence(
@@ -697,6 +699,34 @@ class RetrieverDB:
             for r in final
         ]
         return SearchResult(request_id=request_id, total=len(ordered), results=results)
+
+    def _apply_ordering_shaping(self, ordered: list[dict], query: str = "") -> list[dict]:
+        """事件序号/时间线塑形（默认关闭，仅目标意图查询生效，不改原文）。
+
+        - ``ordering_prefix``：顺序意图查询（has_ordering_intent）时，message 视图
+          按事件时间升序重排并注入 [事件N] 序号前缀（N 为时间序）。
+        - ``chrono_ordering``：时间上下文查询（has_temporal_context）时，结果按
+          事件时间升序重排（不加前缀）。
+        两者共用时间锚（_epoch_of）；无可排序时间的记录保持在原相对位置之后。
+        非目标查询与关闭时完全原样返回（检索代理零回归的保证）。
+        """
+        ordering = bool(self.flags.get("ordering_prefix", False)) and features.has_ordering_intent(query or "")
+        chrono = (not ordering) and bool(self.flags.get("chrono_ordering", False)) and features.has_temporal_context(query or "")
+        if not (ordering or chrono):
+            return ordered
+        # 时间锚：_epoch_of 优先，缺失的排最后（稳定排序保持同锚原序）
+        def anchor(rec: dict):
+            epoch = self._epoch_of(rec)
+            return (0, epoch) if epoch is not None else (1, 0)
+        # 只对 message 视图重排（聚合视图时间语义模糊，保持原序）；稳定排序
+        messages = [r for r in ordered if r.get("view") == "message"]
+        others = [r for r in ordered if r.get("view") != "message"]
+        messages.sort(key=anchor)
+        if ordering:
+            for idx, rec in enumerate(messages, start=1):
+                content = rec.get("content") or ""
+                rec["content"] = f"[事件{idx}] {content}"
+        return messages + others
 
     def _content_for_response(self, rec: dict, query: str = "") -> str:
         """内容塑造：按配置给返回内容附加事件时间元数据（不改原文，不改排序）。

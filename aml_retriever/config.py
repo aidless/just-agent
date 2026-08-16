@@ -46,11 +46,19 @@ DEFAULT_FLAGS: dict[str, bool] = {
     # 显式更新保护：仅允许带通用更新语义（如“更新为 / no longer”）的较新消息
     # 覆写旧消息。它只在 supersession 同时开启时生效；v1.1 将两者组合启用。
     "supersession_update_guard": True,
-    # 个性化证据来源（v1.3 默认启用）：偏好类查询中，轻度抬高用户本人直接陈述，
-    # 绝不删除 assistant 转述或其他原始证据。PersonaMem-v2 检索实测：MRR
-    # 0.346 → 0.607（+0.261）、R@20 +0.085（200 行样本）；locomo10 零回归
-    # （0.9074/0.9565/0.6324 逐位一致）。只对 has_preference_intent 查询生效。
+    # 个性化证据来源（v1.3 回退默认关闭）：偏好类查询中轻度抬高用户本人直接陈述。
+    # 0eeca8b 曾默认启用，声称 PersonaMem-v2 MRR +0.261——同样本配对（50/100/200）
+    # 证明该增益是样本方差伪信号，7fe9b4b 回退；代码保留可消融（L10 对照组）。
     "preference_role_boost": False,
+    # 事件序号塑形（S2，默认关闭）：顺序意图查询（has_ordering_intent）时，
+    # 返回的 message 视图按事件时间升序重排并加 [事件N] 序号前缀，帮助答案模型
+    # 直接按时间线组织事件。只影响该意图查询的响应内容与顺序，不改原文与排序
+    # 特征；探针证据：BEAM event_ordering 上避免拒答并列出事件（见 DECISIONS.md）。
+    "ordering_prefix": False,
+    # 时间线排序（S4，默认关闭）：时间上下文查询（has_temporal_context）时，
+    # 返回结果按事件时间升序重排（不加前缀），多跳时间推理的输入顺序优化。
+    # 与 ordering_prefix 共用排序基建；两者同时开启时以前者为准。
+    "chrono_ordering": False,
     # vNext：实体消歧后的软提升。默认关闭，先通过离线消融确认净收益。
     "entity_boost_v2": False,
     # 时间兜底（v1.2 默认启用）：当 ts_ms 缺失时，按正文时间表达／会话锚点／
