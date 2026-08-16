@@ -59,6 +59,12 @@ DEFAULT_FLAGS: dict[str, bool] = {
     # 返回结果按事件时间升序重排（不加前缀），多跳时间推理的输入顺序优化。
     # 与 ordering_prefix 共用排序基建；两者同时开启时以前者为准。
     "chrono_ordering": False,
+    # 视图过滤（v1.4 候选，默认关闭）：Search 只返回 message 原始消息视图，
+    # 丢弃 window/session-segment 聚合块。动机（LoCoMo-Refined e2e 诊断）：
+    # 聚合视图占据 top-k 前位但无时间锚，ts_prefix 只对 message 视图生效，
+    # 导致答案模型读到相对时间文本；message 原文带 [日期] 前缀且更短。
+    # 证据集合不变（消息全保留），仅去除冗余聚合；locomo10 检索 R@100 不变。
+    "message_view_only": False,
     # vNext：实体消歧后的软提升。默认关闭，先通过离线消融确认净收益。
     "entity_boost_v2": False,
     # 时间兜底（v1.2 默认启用）：当 ts_ms 缺失时，按正文时间表达／会话锚点／

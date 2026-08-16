@@ -683,6 +683,13 @@ class RetrieverDB:
         final = self._apply_slot_guarantee(ordered, limit)
         # 塑形在槽位保证之后：它只重排/加前缀，不改变"哪些记录入选"
         final = self._apply_ordering_shaping(final, query)
+        # 视图过滤（message_view_only，默认关闭）：只返回原始消息视图，丢弃
+        # window/session-segment 聚合块。动机（LoCoMo e2e 诊断）：聚合视图在
+        # top-k 中占据前位但无时间锚（ts_prefix 只对 message 视图生效），导致
+        # 答案模型读到无绝对日期的相对时间文本；message 原文自带 [日期] 前缀。
+        # 证据仍在（消息全部保留），只是不返回冗余聚合块。
+        if self.flags.get("message_view_only", False):
+            final = [r for r in final if r.get("view") == "message"]
 
         results = [
             Evidence(
@@ -1075,7 +1082,11 @@ class RetrieverDB:
         聚合视图的 created_at 取自其首条源消息，因此与原始消息在同一时间轴上，
         可以直接参与相对新近度归一。
         """
-        if "_temporal_epoch" in rec:
+        # 注意：_temporal_epoch 键可能被 _annotate_temporal 显式置 None（视图/正文
+        # 无时间表达时）；此时必须继续走 ts_ms/created_at 兜底，而不是短路返回
+        # None——否则开启 temporal_fallback 后视图记录的时间锚全部丢失，
+        # ts_prefix 无法给视图附加 [日期] 前缀（LoCoMo e2e 时间类失败根因）。
+        if "_temporal_epoch" in rec and rec.get("_temporal_epoch") is not None:
             return rec.get("_temporal_epoch")
         ts_ms = rec.get("ts_ms")
         if ts_ms is not None:
