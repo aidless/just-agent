@@ -18,14 +18,17 @@ It does not generate final answers.
 | Text Memory · Open-source / Academic Methods, first public snapshot | `FlowGrid_AML_Retriever` | **#8** | **43.98** | v1.0 |
 
 The top score in that snapshot was 45.06, a difference of 1.08 points. The
-current repository is v1.3. Compared with v1.1 it adds guarded,
+current repository is v1.4. Compared with v1.1 it adds guarded,
 evidence-backed changes on top of the same deterministic core: temporal
 fallback for messages without timestamps, a day-level event-time prefix on
 returned evidence that is applied only when the query has temporal context
-(see [docs/EVAL.md](docs/EVAL.md)), and a query-type-aware recency weight
-(plain non-temporal queries get 2.0 instead of 8.0). These changes have local
-synthetic, retrieval-proxy, and end-to-end evidence but have not been assigned
-a new official score.
+(see [docs/EVAL.md](docs/EVAL.md)), a query-type-aware recency weight
+(plain non-temporal queries get 2.0 instead of 8.0), and a time-anchor
+fallback fix so aggregate views correctly fall back to message timestamps
+when no in-body time expression exists (v1.4; local paired end-to-end
+reproduction +5.3pp on the same slice). These changes have local synthetic,
+retrieval-proxy, and end-to-end evidence but have not been assigned a new
+official score.
 
 ## What it does
 
