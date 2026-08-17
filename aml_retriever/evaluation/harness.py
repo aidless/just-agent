@@ -49,6 +49,11 @@ _L12 = {**_L11, "preference_role_boost": False}
 # L14：时间上下文查询按事件时间升序重排（不加前缀）
 _L13 = {**_L12, "ordering_prefix": True}
 _L14 = {**_L12, "chrono_ordering": True}
+# v1.4 D/H 修复（研究包学习所得，默认关闭，消融中）：
+# L15：冲突成对返回（同话题相反极性成对提升，D 维度 contradiction）
+# L16：低置信弃权（无 token 重合返回空证据集，H 维度 abstention）
+_L15 = {**_L12, "conflict_pair_return": True}
+_L16 = {**_L12, "low_confidence_abstain": True}
 
 # L0→L5 是 v1.0 累进主线；v1.1 在 L5 上加入受保护覆写形成 L9；
 # v1.2 在 L9 上启用时间兜底与内容时间戳前缀形成 L11；
@@ -70,6 +75,8 @@ ABLATION_LADDER: list[tuple[str, dict]] = [
     ("L12_v13_production",      _L12),
     ("L13_ordering_shaping",    _L13),
     ("L14_chrono_ordering",     _L14),
+    ("L15_conflict_pair",       _L15),
+    ("L16_low_conf_abstain",    _L16),
 ]
 
 # 主线档位（累进），对照组不参与「只增不减」检查

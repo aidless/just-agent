@@ -691,6 +691,19 @@ class RetrieverDB:
         if self.flags.get("message_view_only", False):
             final = [r for r in final if r.get("view") == "message"]
 
+        # v1.4 H 修复（low_confidence_abstain）：低置信弃权。若返回结果与查询
+        # 无任何 token 重合（无相关证据），返回空证据集，让答案模型对无证据
+        # 问题弃权而非编造。对齐合规冲榜路线"对没有证据的问题返回无法确定所需
+        # 的空证据状态"。只在确实零重合时触发，不误伤正常召回。
+        if self.flags.get("low_confidence_abstain", False) and final and tokens:
+            token_set = set(tokens)
+            has_overlap = any(
+                token_set & set(features.tokenize(r.get("content") or ""))
+                for r in final
+            )
+            if not has_overlap:
+                return SearchResult(request_id=request_id, total=len(ordered), results=[])
+
         results = [
             Evidence(
                 id=r["id"],
@@ -971,6 +984,9 @@ class RetrieverDB:
 
         if self.flags.get("rerank", True):
             self._mark_conflicts(records)
+        if self.flags.get("conflict_pair_return", False):
+            # v1.4 D 修复：冲突成对返回（同话题相反极性成对提升，确保成对返回）。
+            self._mark_polarity_conflicts(records)
         if self.flags.get("supersession", False):
             # 用「原始」时间意图判定，不受 flags["temporal_intent"] 影响：
             # 覆写检测与新近度放大是两个独立机制，前者不应被后者的开关连带关掉。
@@ -1143,6 +1159,55 @@ class RetrieverDB:
             newest["score"] += W_CONFLICT_LATEST
             if "latest_state" not in newest["flags"]:
                 newest["flags"].append("latest_state")
+
+    def _mark_polarity_conflicts(self, records) -> None:
+        """v1.4 D 修复（conflict_pair_return）：检测同话题、相反极性的消息对。
+
+        对齐合规冲榜路线「无法确定是更新还是矛盾时，保留 conflicted 并把两个
+        证据一起返回」。检测「话题指纹高度重合 + 一肯定一否定」的消息对，
+        检测到即**同时提升两条**，确保成对进入 top-k，让答案模型看到矛盾
+        而非只取其一（针对 BEAM contradiction_resolution 本地实测 0.000：
+        模型只见否定侧、答 "No."）。
+
+        只做提升，不过滤、不删除、不改写原文。判定是纯结构性的
+        （token 重合 + 否定极性），不依赖评测集硬编码。
+        """
+        pool = [r for r in records if r["view"] == "message"]
+        if len(pool) < 2:
+            return
+        pool.sort(key=lambda r: (-float(r.get("score") or 0.0), r["id"]))
+        pool = pool[:40]
+        sigs = {r["id"]: self._supersession_signature(r["content"]) for r in pool}
+        neg = {r["id"]: features.has_negation(r["content"]) for r in pool}
+        weight = float(getattr(self.config, "conflict_pair_weight", 3.0))
+        min_overlap = float(getattr(self.config, "conflict_pair_min_overlap", 0.4))
+        paired: set[str] = set()
+        for i in range(len(pool)):
+            a = pool[i]
+            sig_a = sigs[a["id"]]
+            if not sig_a:
+                continue
+            for j in range(i + 1, len(pool)):
+                b = pool[j]
+                sig_b = sigs[b["id"]]
+                if not sig_b or sig_a == sig_b:
+                    continue
+                if neg[a["id"]] == neg[b["id"]]:
+                    continue  # 同极性，非矛盾
+                inter = len(sig_a & sig_b)
+                if not inter:
+                    continue
+                if inter / float(min(len(sig_a), len(sig_b))) < min_overlap:
+                    continue
+                paired.add(a["id"])
+                paired.add(b["id"])
+        if not paired:
+            return
+        for rec in records:
+            if rec["id"] in paired:
+                rec["score"] += weight
+                if "polarity_conflict_pair" not in rec["flags"]:
+                    rec["flags"].append("polarity_conflict_pair")
 
     def _supersession_signature(self, text: str) -> frozenset:
         """消息的「话题指纹」：长度≥2 的 n-gram 集合。

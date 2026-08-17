@@ -92,6 +92,15 @@ DEFAULT_FLAGS: dict[str, bool] = {
     # 前缀在非时间类问题小幅回退，cat4 −0.008 / cat5 −0.030）。设 True 恢复
     # v1.2 的无条件行为（供对照消融）。
     "content_timestamp_prefix_unconditional": False,
+    # v1.4 D 修复（默认关闭，消融中）：冲突成对返回。检测同话题、相反极性
+    # （一肯定一否定）的消息对，检测到即同时提升两条，确保成对返回，让答案模型
+    # 看到矛盾而非只取其一。对齐合规冲榜路线"无法确定更新还是矛盾时保留 conflicted
+    # 并把两个证据一起返回"。针对 BEAM contradiction_resolution（本地实测 0.000）。
+    "conflict_pair_return": False,
+    # v1.4 H 修复（默认关闭，消融中）：低置信弃权。当检索结果与查询无任何 token
+    # 重合（无相关证据）时返回空证据集，让答案模型对无证据问题弃权而非编造。
+    # 对齐合规冲榜路线"对没有证据的问题返回无法确定所需的空证据状态"。
+    "low_confidence_abstain": False,
 }
 
 
@@ -155,6 +164,14 @@ class RetrieverConfig:
     # 偏好类查询中，“role=user + 第一人称偏好陈述”的软加权。
     # 只改变排序，不过滤任何候选，且在 RRF 前进入特征路排序。
     preference_role_weight: float = 14.0
+
+    # v1.4 D 修复：冲突成对返回的提升权重与话题重合阈值（conflict_pair_return 开启时生效）。
+    conflict_pair_weight: float = 3.0
+    conflict_pair_min_overlap: float = 0.4
+
+    # v1.4 H 修复：低置信弃权阈值（low_confidence_abstain 开启时生效）。
+    # 最佳候选的查询 token 覆盖率低于该值时返回空证据集（弃权）。
+    abstain_min_coverage: float = 0.0
 
     # vNext：实体消歧后的软提升。仅在 flags["entity_boost_v2"] 开启时生效。
     entity_disambiguation_weight: float = 35.0

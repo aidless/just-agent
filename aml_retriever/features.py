@@ -114,6 +114,26 @@ def has_update_cue(text: str) -> bool:
     return any(marker in lowered for marker in _UPDATE_EN)
 
 
+# 否定表达：用于 D 维度冲突成对返回（检测同话题相反极性）。
+_NEGATION_EN = (
+    " not ", " never ", " no ", "don't", "dont", "doesn't", "doesnt",
+    "isn't", "isnt", "aren't", "arent", "haven't", "havent", "hasn't",
+    "hasnt", "didn't", "didnt", "won't", "wont", "can't", "cant",
+    "couldn't", "couldnt", "without", "rarely", "seldom", "hardly",
+)
+_NEGATION_CN = ("不", "没", "无", "未", "别", "莫", "非")
+
+
+def has_negation(text: str) -> bool:
+    """判断陈述是否含否定表达（用于相反极性冲突检测）。"""
+    if not text:
+        return False
+    if any(marker in text for marker in _NEGATION_CN):
+        return True
+    padded = " " + text.lower() + " "
+    return any(marker in padded for marker in _NEGATION_EN)
+
+
 def has_preference_intent(text: str) -> bool:
     """判断查询是否在询问偏好或习惯。"""
     if not text:
@@ -347,6 +367,7 @@ __all__ = [
     "extract_non_date_numbers",
     "extract_dates",
     "extract_phrases",
+    "has_negation",
     "extract_entities",
     "normalize",
     "has_temporal_intent",
