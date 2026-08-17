@@ -1,4 +1,4 @@
-# FlowGrid AML Retriever — Add/Search runtime image.
+# just-agent — Add/Search runtime image.
 #
 # Build:
 #   docker build -t flowgrid-aml-retriever:local .

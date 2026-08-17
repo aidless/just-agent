@@ -1,4 +1,4 @@
-# FlowGrid AML Retriever
+# just-agent
 
 Deterministic, evidence-first memory retrieval for the
 [Agent Memory Leaderboard](https://agentmemories.ai/leaderboard/).
@@ -6,20 +6,18 @@ Deterministic, evidence-first memory retrieval for the
 [中文说明](README.zh-CN.md) · [API contract](docs/API_CONTRACT.md) ·
 [Evaluation methodology](docs/EVAL.md) · [Data lifecycle](docs/DATA_LIFECYCLE.md)
 
-FlowGrid AML Retriever implements the two operations required from a memory
+just-agent implements the two operations required from a memory
 system: synchronous `Add` and user-isolated `Search`. It stores every original
 message, builds traceable retrieval views, and returns ranked source evidence.
 It does not generate final answers.
 
-## Leaderboard result
+## Submission status
 
-| Track | Entry | Rank | Score | Evaluated version |
-| --- | --- | ---: | ---: | --- |
-| Text Memory · Open-source / Academic Methods, first public snapshot | `FlowGrid_AML_Retriever` | **#8** | **43.98** | v1.0 |
-
-The top score in that snapshot was 45.06, a difference of 1.08 points. The
-current repository is v1.4. Compared with v1.1 it adds guarded,
-evidence-backed changes on top of the same deterministic core: temporal
+This repository is submitted to the Agent Memory Leaderboard
+(Text Memory · Open-source / Academic Methods track) as a first-time entry.
+It has not yet received an official evaluation score. The current version is
+v1.4. Compared with earlier iterations it adds guarded, evidence-backed changes
+on top of the same deterministic core: temporal
 fallback for messages without timestamps, a day-level event-time prefix on
 returned evidence that is applied only when the query has temporal context
 (see [docs/EVAL.md](docs/EVAL.md)), a query-type-aware recency weight
@@ -321,10 +319,10 @@ config.example.json
 
 ## Project boundary
 
-FlowGrid AML Retriever is an independent leaderboard implementation. It applies
-FlowGrid's ideas of provenance, temporal state, conflict preservation, and user
-isolation, but it is not the FlowGrid Core product and its leaderboard results
-should not be interpreted as validation of FlowGrid Core.
+just-agent is an independent, self-contained leaderboard implementation focused on
+deterministic, evidence-first memory retrieval. It applies ideas of provenance,
+temporal state, conflict preservation, and user isolation. It provides retrieval
+evidence only and does not generate final answers.
 
 ## License
 
