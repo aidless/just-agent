@@ -65,8 +65,8 @@ HTTP wrapper 与检索引擎分层：协议变化集中在 `api.py` 和 `server.
 环境要求：Python 3.11+，且 Python 的 `sqlite3` 已启用 FTS5。
 
 ```bash
-git clone https://github.com/dlxeva/flowgrid-aml-retriever.git
-cd flowgrid-aml-retriever
+git clone https://github.com/aidless/just-agent.git
+cd just-agent
 
 # 环境检查、150 项单测、CLI 自检、31 项 HTTP smoke
 ./scripts/run_tests.sh

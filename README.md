@@ -87,8 +87,8 @@ Requirements:
 - Python's `sqlite3` linked with FTS5
 
 ```bash
-git clone https://github.com/dlxeva/flowgrid-aml-retriever.git
-cd flowgrid-aml-retriever
+git clone https://github.com/aidless/just-agent.git
+cd just-agent
 
 # Environment check, 150 unit tests, CLI self-check, and 31 HTTP smoke checks
 ./scripts/run_tests.sh
