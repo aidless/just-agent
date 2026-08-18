@@ -101,6 +101,12 @@ DEFAULT_FLAGS: dict[str, bool] = {
     # 重合（无相关证据）时返回空证据集，让答案模型对无证据问题弃权而非编造。
     # 对齐合规冲榜路线"对没有证据的问题返回无法确定所需的空证据状态"。
     "low_confidence_abstain": False,
+    # v1.4 D 修复（默认关闭，消融中）：current-value 查询新近度。对"问某属性当前
+    # 取值"的查询（how many / what is my / when is my，且无过去时间标记）抬高新近度
+    # 权重，使最新版本排前。针对 BEAM knowledge_update 失败诊断：34% 失败是检索返回
+    # 旧版本（gold 165 commits 只返回 150）。v1.3 把 plain 查询弱化到 recency=2.0，
+    # 此类查询被误归 plain 档。预期增益小（折算总分 <1 分），需门禁防回归。
+    "current_value_recency": False,
 }
 
 
@@ -149,6 +155,10 @@ class RetrieverConfig:
     # 无关的最新消息顶到相关旧消息之上，如 "When does my first sprint end?" 返回
     # 一堆 Flask 无关消息；普通查询改用低权重，时间查询保持 recency_weight）。
     recency_weight_plain: float = 2.0
+    # v1.4 D 修复：current-value 查询的新近度权重（current_value_recency 开启时生效）。
+    # 介于 plain(2.0) 与 temporal(8.0) 之间：既要抬最新值，又不至于像 temporal 那样
+    # 把无关最新消息顶过相关旧证据。具体取值需跨 seed 门禁确定。
+    recency_weight_current_value: float = 5.0
 
     # 覆写检测参数（仅在 flags["supersession"] 开启时生效）。
     # min_overlap 是两条消息「谈的是同一件事」的判定阈值，按 containment

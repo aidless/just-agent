@@ -869,13 +869,25 @@ class RetrieverDB:
         #   BEAM 实证，多月经度对话中 recency=8 会把 2026 年的无关消息顶到
         #   2024 年的事实答案之上（"When does my first sprint end?" 答案排 rank 11）。
         current_state = features.has_temporal_intent(query)
+        # v1.4 D 修复：current-value 查询（问某属性当前取值）抬高新近度，使最新版本
+        # 排前。仅在 flag 开启且非 temporal_intent/current_state 时生效（后两者已有
+        # 更高权重）。针对 BEAM knowledge_update 34% 失败（返回旧版本）。
+        current_value = (
+            self.flags.get("current_value_recency", False)
+            and not current_state
+            and features.has_current_value_intent(query)
+        )
         recency_weight = (
             float(getattr(self.config, "recency_weight_intent", W_RECENCY_INTENT))
             if temporal_intent
             else (
                 float(getattr(self.config, "recency_weight", W_RECENCY))
                 if current_state
-                else float(getattr(self.config, "recency_weight_plain", 2.0))
+                else (
+                    float(getattr(self.config, "recency_weight_current_value", 5.0))
+                    if current_value
+                    else float(getattr(self.config, "recency_weight_plain", 2.0))
+                )
             )
         )
         # vNext：仅在开关打开时用分级时间解析给每条候选附加事件时间。

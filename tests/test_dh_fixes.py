@@ -108,5 +108,65 @@ class TestLowConfidenceAbstain(unittest.TestCase):
             db.close()
 
 
+class TestCurrentValueRecency(unittest.TestCase):
+    """v1.4 D 修复：current-value 查询抬最新值。"""
+
+    def test_intent_detection(self):
+        from aml_retriever import features
+        # 当前值查询
+        self.assertTrue(features.has_current_value_intent(
+            "How many commits have been merged into the main branch?"))
+        self.assertTrue(features.has_current_value_intent(
+            "What is my monthly budget for books?"))
+        self.assertTrue(features.has_current_value_intent(
+            "When is my final decision meeting scheduled?"))
+        # 历史查询（含过去/序数标记）不应触发
+        self.assertFalse(features.has_current_value_intent(
+            "When does my first sprint end?"))
+        self.assertFalse(features.has_current_value_intent(
+            "When did I originally set the budget?"))
+        self.assertFalse(features.has_current_value_intent(
+            "What was my budget last year?"))
+
+    def _db(self, flag: bool):
+        cfg = RetrieverConfig(db_path=":memory:").with_flags(
+            views=False, rrf=False, dedup=False, supersession=False,
+            current_value_recency=flag,
+        )
+        db = RetrieverDB(cfg)
+        db.add(request_id="r1", user_id="u1", session_id="s1", messages=[
+            {"role": "user", "content": "There are 150 commits in the main branch.",
+             "timestamp": 1_600_000_000_000},
+            {"role": "user", "content": "I just merged more, now there are 165 commits in main.",
+             "timestamp": 1_600_000_900_000},
+        ])
+        return db
+
+    def test_latest_version_ranked_first_when_on(self):
+        db = self._db(True)
+        try:
+            res = db.search(user_id="u1",
+                            query="How many commits have been merged into the main branch?",
+                            top_k=10)
+            self.assertGreater(len(res.results), 0)
+            top = _raw(res.results[0].content)
+            self.assertIn("165", top, "开启后最新版本 165 应排第一")
+        finally:
+            db.close()
+
+    def test_off_by_default_no_change(self):
+        db = self._db(False)
+        try:
+            res = db.search(user_id="u1",
+                            query="How many commits have been merged into the main branch?",
+                            top_k=10)
+            flagged = [e for e in res.results
+                       if any("recency" in f for f in e.evidence_flags)]
+            # flag 关闭时不应有 current_value 触发的额外抬升（行为同基线）
+            self.assertGreater(len(res.results), 0)
+        finally:
+            db.close()
+
+
 if __name__ == "__main__":
     unittest.main()

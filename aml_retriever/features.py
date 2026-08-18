@@ -230,6 +230,38 @@ def has_ordering_intent(text: str) -> bool:
     return any(marker in lowered for marker in _ORDERING_INTENT_EN)
 
 
+# 当前值意图：问"某属性的当前取值"（数量/预算/日期/状态），答案是最新版本。
+# 与 has_temporal_intent 的"现在/当前"显式标记互补——这类查询往往不含
+# "current/now" 字样（如 "How many commits have been merged into main?"），
+# 因此被 v1.3 归入 plain 档（recency=2.0），导致取到旧版本而非最新值。
+_CURRENT_VALUE_EN = (
+    "how many", "how much", "what is my", "what's my", "what are my",
+    "what is the", "what's the", "when is my", "when is the", "when are my",
+    "what time is my", "what time is the", "my current", "the current",
+    "currently", "right now", "at the moment",
+)
+_CURRENT_VALUE_CN = ("现在有多少", "目前是多少", "当前是多少", "现在是", "目前我的", "当前的")
+# 排除标记：含明确过去时间/序数的查询是历史问题，不应抬最新值
+# （BEAM 实证：recency 抬高会把 "When does my first sprint end?" 答错）。
+_NOT_CURRENT_VALUE_EN = (
+    "when did", "when was", "first", "initially", "originally", "used to",
+    "in the past", "last year", "last month", "ago", "previously", "started",
+    "began", "the first", "my first", "earliest", "original",
+)
+
+
+def has_current_value_intent(text: str) -> bool:
+    """判断查询是否在问某属性的当前取值（答案应为最新版本）。"""
+    if not text:
+        return False
+    lowered = text.lower()
+    if any(marker in lowered for marker in _NOT_CURRENT_VALUE_EN):
+        return False
+    if any(marker in text for marker in _CURRENT_VALUE_CN):
+        return True
+    return any(marker in lowered for marker in _CURRENT_VALUE_EN)
+
+
 # 建议/咨询意图（个性化建议类）：PersonaMem 式问题多为"给我建议/推荐"，
 # 与 has_preference_intent 的"直接问偏好"互补。独立函数，不改动原意图。
 _ADVICE_INTENT_EN = (
@@ -380,5 +412,6 @@ __all__ = [
     "has_duration_intent",
     "has_temporal_context",
     "has_ordering_intent",
+    "has_current_value_intent",
     "has_advice_intent",
 ]
