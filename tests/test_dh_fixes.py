@@ -131,6 +131,7 @@ class TestCurrentValueRecency(unittest.TestCase):
     def _db(self, flag: bool):
         cfg = RetrieverConfig(db_path=":memory:").with_flags(
             views=False, rrf=False, dedup=False, supersession=False,
+            ebbinghaus_decay=False, consolidation_dedup=False,
             current_value_recency=flag,
         )
         db = RetrieverDB(cfg)

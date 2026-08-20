@@ -9,6 +9,9 @@ data/
 venv/
 eval_out/
 
+# Secrets — never commit
+.env
+
 # Local/editor state
 .idea/
 .vscode/

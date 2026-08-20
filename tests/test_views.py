@@ -90,7 +90,8 @@ class TestIncrementalEqualsFullScan(unittest.TestCase):
 
     def test_incremental_matches_reference(self):
         cfg = RetrieverConfig(db_path=self.path, window_size=3, window_overlap=1,
-                              segment_max_messages=4, segment_max_gap_seconds=1800)
+                              segment_max_messages=4, segment_max_gap_seconds=1800,
+                              ).with_flags(consolidation_dedup=False)
         db = RetrieverDB(cfg)
         base = 1_700_000_000_000
         total = 0

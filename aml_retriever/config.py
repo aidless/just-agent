@@ -107,6 +107,27 @@ DEFAULT_FLAGS: dict[str, bool] = {
     # 旧版本（gold 165 commits 只返回 150）。v1.3 把 plain 查询弱化到 recency=2.0，
     # 此类查询被误归 plain 档。预期增益小（折算总分 <1 分），需门禁防回归。
     "current_value_recency": False,
+    # Ebbinghaus 指数遗忘曲线（授权数据门禁通过，已提升为默认）：把相对新近度从候选集内线性归一
+    # (epoch-ts_min)/ts_span 换成指数衰减 exp(-λ·Δt)，Δt 为该事实距候选集内最新事件
+    # 的天数（以最新事件为「上次访问」参考点），使陈旧事实自然衰减。锚定候选集而非
+    # 墙钟：评测不注入查询时刻，绝对墙钟会让整批老语料的衰减值塌缩到 ~0 而丧失区分力，
+    # 且结果随运行日期漂移不可复现。授权数据门禁：LoCoMo +0.0026 MRR / BEAM +0.0144 MRR。
+    "ebbinghaus_decay": True,
+    # Consolidation N->1 deterministic dedup（授权数据门禁通过，已提升为默认）。
+    # Add 阶段：当新消息的话题指纹与 ≥N 条已有活跃消息匹配（同一时间窗内）时，合并为
+    # 一条摘要视图（保留最新内容 + 全部来源 ID 并集），归档原始消息（标记 consolidated=1
+    # 并从 FTS 移除，不再作为独立候选）。判定纯结构性（token containment + 时间窗），
+    # 完全确定性、可复现。动机：同主题冗余事实堆积时用一条摘要替代 N 条噪声，降低 top-k
+    # 冗余。召回安全：摘要 source_ids 含全部原始消息 ID，gold 按 source_message_ids
+    # 判定仍命中；原始行保留于 messages 表供审计/回溯。授权数据门禁：BEAM +10.7% R@20。
+    "consolidation_dedup": True,
+    # LLM 事实抽取（scnet Kimi-K2.5，默认关闭）。Add 阶段调用 scnet API 从消息中抽取
+    # 结构化事实三元组（subject/predicate/object/time），存入独立 facts 表（与现有 FTS5
+    # 并列）。Search 阶段对 knowledge_update/temporal 查询额外检索事实表，对事实命中的
+    # 证据做分数提升，并补充词法召回遗漏的事实匹配消息。API 不可用时（无 SC_API_KEY、
+    # 超时、响应异常）静默回退纯词法路径——与关闭 flag 观察等价，只是不会出现 fact_match
+    # 证据标记。凭据从环境变量 SC_API_KEY / SC_API_BASE 读取，绝不硬编码。
+    "fact_extraction": False,
 }
 
 
@@ -159,6 +180,36 @@ class RetrieverConfig:
     # 介于 plain(2.0) 与 temporal(8.0) 之间：既要抬最新值，又不至于像 temporal 那样
     # 把无关最新消息顶过相关旧证据。具体取值需跨 seed 门禁确定。
     recency_weight_current_value: float = 5.0
+
+    # Ebbinghaus 指数遗忘的衰减常数 λ（仅在 flags["ebbinghaus_decay"] 开启时生效）。
+    # recency = exp(-λ · Δt_days)，Δt 为事实距候选集最新事件的天数。λ 越大陈旧事实
+    # 衰减越快：0.1/天 时约 7 天衰减到 ~0.50、30 天到 ~0.05。需跨 seed 门禁确定。
+    decay_lambda: float = 0.1
+
+    # Consolidation N->1 参数（仅在 flags["consolidation_dedup"] 开启时生效）。
+    # consolidation_min_cluster: 触发合并所需的最少已有匹配消息数 N（新消息 + N 已有 → 1 摘要）。
+    # consolidation_time_window_seconds: 只有事件时间在该窗口内（|Δt| ≤ 窗口）的已有消息才参与匹配。
+    #   0 表示不限时间窗（任意时间均可合并，慎用——会把跨期同主题消息误并）。
+    # consolidation_min_overlap: 话题指纹重合阈值（containment = 交集 / 较短一方 token 数，
+    #   token 取长度≥2 的 n-gram，与 supersession 同一指纹基建）。
+    # consolidation_max_scan: 每条新消息扫描的已有活跃消息上限（界定 Add 热路径最坏代价）。
+    consolidation_min_cluster: int = 3
+    consolidation_time_window_seconds: int = 604800  # 7 天
+    consolidation_min_overlap: float = 0.5
+    consolidation_max_scan: int = 1000
+
+    # LLM 事实抽取参数（仅在 flags["fact_extraction"] 开启时生效）。
+    # fact_boost_weight         : 事实命中的证据分数提升量（在 RRF 融合前的特征路生效）。
+    # fact_extraction_model     : scnet API 模型名（团队验证 Kimi-K2.5，1.52s/消息）。
+    # fact_extraction_timeout   : API 超时秒数；超时静默回退，不阻塞 Add。
+    # fact_max_per_message      : 每条消息最多抽取/存储的事实数（控制 Add 延迟与表体积）。
+    # fact_extra_candidates     : Search 时从事实表补充的、词法召回遗漏的最大消息数。
+    # 凭据 SC_API_KEY / SC_API_BASE 从环境变量读取，不在此处配置。
+    fact_boost_weight: float = 25.0
+    fact_extraction_model: str = "kimi-k2.5"
+    fact_extraction_timeout: float = 5.0
+    fact_max_per_message: int = 8
+    fact_extra_candidates: int = 10
 
     # 覆写检测参数（仅在 flags["supersession"] 开启时生效）。
     # min_overlap 是两条消息「谈的是同一件事」的判定阈值，按 containment
@@ -232,6 +283,16 @@ class RetrieverConfig:
             "AML_RRF_W_LEXICAL": ("rrf_weight_lexical", float),
             "AML_RECENCY_W": ("recency_weight", float),
             "AML_RECENCY_W_INTENT": ("recency_weight_intent", float),
+            "AML_DECAY_LAMBDA": ("decay_lambda", float),
+            "AML_CONSOLIDATION_MIN_CLUSTER": ("consolidation_min_cluster", int),
+            "AML_CONSOLIDATION_TIME_WINDOW": ("consolidation_time_window_seconds", int),
+            "AML_CONSOLIDATION_MIN_OVERLAP": ("consolidation_min_overlap", float),
+            "AML_CONSOLIDATION_MAX_SCAN": ("consolidation_max_scan", int),
+            "AML_FACT_BOOST_WEIGHT": ("fact_boost_weight", float),
+            "AML_FACT_EXTRACTION_MODEL": ("fact_extraction_model", str),
+            "AML_FACT_EXTRACTION_TIMEOUT": ("fact_extraction_timeout", float),
+            "AML_FACT_MAX_PER_MESSAGE": ("fact_max_per_message", int),
+            "AML_FACT_EXTRA_CANDIDATES": ("fact_extra_candidates", int),
             "AML_ENTITY_DISAMBIGUATION_W": ("entity_disambiguation_weight", float),
             "AML_ENTITY_COOCCURRENCE_W": ("entity_cooccurrence_weight", float),
             "AML_TEMPORAL_FALLBACK_TOP_N": ("temporal_fallback_top_n", int),

@@ -126,24 +126,34 @@ def _dedup_impl(ordered: list[dict], *, drop_views_by_sources: bool) -> list[dic
         if digest in seen_hash:
             continue
         sources = set(rec["source_ids"])
-        # 聚合视图若已被某条保留视图完全覆盖，则丢弃（原始消息永不丢弃）
-        if rec["view"] != "message" and any(sources <= c for c in covered):
+        # 聚合视图若已被某条保留视图完全覆盖，则丢弃（原始消息永不丢弃）；
+        # consolidation 摘要视同原始消息保护——其来源已被归档，不可被覆盖丢弃
+        if rec["view"] not in ("message", "consolidation") and any(sources <= c for c in covered):
             continue
         # 优化开关：视图的所有来源消息都已保留时，视图是纯冗余
         if (
             drop_views_by_sources
-            and rec["view"] != "message"
+            and rec["view"] not in ("message", "consolidation")
             and sources
             and sources <= kept_msg_ids
         ):
             continue
         seen_hash.add(digest)
-        if rec["view"] != "message":
+        if rec["view"] not in ("message", "consolidation"):
             covered.append(sources)
         else:
             kept_msg_ids.add(rec["id"])
         kept.append(rec)
     return kept
+
+
+def _consolidation_view_id(user_id: str, source_ids: list[str]) -> str:
+    """合并摘要视图的确定性 ID：以 (user_id, 排序后的全部来源消息 ID) 为指纹。
+
+    相同来源集合 → 相同 view_id，保证合并幂等（重复请求/批内二次触发不会产生重复摘要）。
+    """
+    raw = f"{user_id}\x00cons\x00{','.join(source_ids)}".encode("utf-8")
+    return "c_" + hashlib.sha1(raw).hexdigest()[:16]
 
 
 class RetrieverDB:
@@ -167,6 +177,7 @@ class RetrieverDB:
             self._shared_mem_con = self._new_connection()
 
         self._dense: DenseIndex | None = None
+        self._fact_ext = None  # 惰性初始化 LLM 事实抽取器（仅 flags["fact_extraction"] 开启时）
 
         self._init_schema()
 
@@ -260,7 +271,8 @@ class RetrieverDB:
                     has_temporal_expr INTEGER,
                     created_at TEXT NOT NULL,
                     request_id TEXT,
-                    added_at TEXT NOT NULL
+                    added_at TEXT NOT NULL,
+                    consolidated INTEGER NOT NULL DEFAULT 0
                 );
                 CREATE INDEX IF NOT EXISTS idx_msg_scope ON messages(user_id, session_id, seq);
                 CREATE INDEX IF NOT EXISTS idx_msg_user ON messages(user_id);
@@ -305,6 +317,32 @@ class RetrieverDB:
                     user_id UNINDEXED,
                     doc_type UNINDEXED
                 );
+
+                -- LLM 事实抽取：独立事实表（与现有 FTS5 并列）。
+                -- 每条事实是一条 (subject, predicate, object, time) 三元组，回指源消息。
+                -- flags["fact_extraction"] 关闭时表为空、不影响检索；开启时由 Add 阶段填充。
+                CREATE TABLE IF NOT EXISTS facts(
+                    id TEXT PRIMARY KEY,
+                    message_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    session_id TEXT,
+                    subject TEXT NOT NULL,
+                    predicate TEXT NOT NULL,
+                    object TEXT NOT NULL,
+                    time_value TEXT,
+                    time_epoch REAL,
+                    created_at TEXT NOT NULL,
+                    added_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_facts_user ON facts(user_id);
+                CREATE INDEX IF NOT EXISTS idx_facts_msg ON facts(message_id);
+                CREATE INDEX IF NOT EXISTS idx_facts_subj ON facts(user_id, subject);
+
+                CREATE VIRTUAL TABLE IF NOT EXISTS fts_facts USING fts5(
+                    fact_text,
+                    fact_id UNINDEXED,
+                    user_id UNINDEXED
+                );
                 """
             )
             # 兼容已有库：SQLite 没有 ADD COLUMN IF NOT EXISTS，故按 schema 自检后迁移。
@@ -317,6 +355,7 @@ class RetrieverDB:
                 ("partial_day", "INTEGER"),
                 ("partial_expression", "TEXT"),
                 ("has_temporal_expr", "INTEGER"),
+                ("consolidated", "INTEGER NOT NULL DEFAULT 0"),
             ):
                 if column not in existing:
                     con.execute(f"ALTER TABLE messages ADD COLUMN {column} {ddl}")
@@ -373,6 +412,9 @@ class RetrieverDB:
         if isinstance(result, tuple) and len(result) == 2:
             add_result, dense_docs = result
             self._embed_dense_after_add(user_id, dense_docs)
+            # LLM 事实抽取：事务提交后异步抽取（网络调用，不占用写锁）。
+            # dense_docs = [(doc_id, content), ...]，复用已有的新消息内容列表。
+            self._extract_facts_after_add(user_id, session_id, dense_docs)
             return add_result
         return result
 
@@ -388,6 +430,66 @@ class RetrieverDB:
         except Exception:
             # 稠密通道失败不回滚已提交的写入；下次 Search 自动退回词法路径
             pass
+
+    # -------------------------------------------------------- fact extraction
+    def _fact_extractor(self):
+        """惰性初始化 LLM 事实抽取器（仅 flags["fact_extraction"] 开启时）。"""
+        if not self.flags.get("fact_extraction", False):
+            return None
+        if self._fact_ext is None:
+            from .fact_extraction import FactExtractor
+            self._fact_ext = FactExtractor.from_config(self.config)
+        return self._fact_ext
+
+    def _extract_facts_after_add(
+        self, user_id: str, session_id: str | None, dense_docs: list[tuple[str, str]]
+    ) -> None:
+        """事务提交后为新增消息抽取 LLM 事实（网络调用，不占用写锁）。
+
+        失败静默处理——API 不可用/超时/异常时无事实存入，检索自动回退纯词法路径。
+        dense_docs = [(doc_id, content), ...]，复用 Add 已构建的新消息列表。
+        """
+        if not self.flags.get("fact_extraction", False):
+            return
+        if not dense_docs:
+            return
+        extractor = self._fact_extractor()
+        if extractor is None:
+            return  # API 未配置（SC_API_KEY 缺失等），优雅跳过
+        facts_batch: list[tuple[str, str, str | None, object]] = []
+        for doc_id, content in dense_docs:
+            try:
+                facts = extractor.extract_facts(content)
+            except Exception:
+                facts = []  # 任何失败 → 该消息无事实，不影响其他消息或整体 Add
+            for fact in facts:
+                facts_batch.append((doc_id, user_id, session_id, fact))
+        if facts_batch:
+            self._store_facts(facts_batch)
+
+    def _store_facts(self, facts_batch: list[tuple[str, str, str | None, object]]) -> None:
+        """持久化抽取的事实到 facts 表 + fts_facts。走写锁，保证线程安全。"""
+        from .fact_extraction import build_fact_id
+
+        def _do(con: sqlite3.Connection):
+            now = _now_iso()
+            for doc_id, user_id, session_id, fact in facts_batch:
+                fact_id = build_fact_id(doc_id, fact)
+                fact_text = fact.fact_text()
+                con.execute(
+                    "INSERT OR REPLACE INTO facts"
+                    "(id, message_id, user_id, session_id, subject, predicate, object, "
+                    "time_value, time_epoch, created_at, added_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                    (fact_id, doc_id, user_id, session_id,
+                     fact.subject, fact.predicate, fact.object,
+                     fact.time_value, fact.time_epoch, now, now),
+                )
+                con.execute(
+                    "INSERT OR REPLACE INTO fts_facts(fact_text, fact_id, user_id) VALUES(?,?,?)",
+                    (features.index_text(fact_text), fact_id, user_id),
+                )
+
+        self._write(_do)
 
     def _add_locked(self, con, request_id, user_id, session_id, normalized):
         row = con.execute(
@@ -482,6 +584,12 @@ class RetrieverDB:
             if self.flags.get("dense_index_views", False):
                 dense_docs.extend(view_docs)
 
+        # Consolidation N->1：归档冗余同主题消息并产出摘要视图（默认关闭）。
+        # 必须在消息/视图落库后、commit 前执行：它读取刚写入的活跃消息、判定合并、
+        # 归档原始行并新建摘要。整个 pass 在同一事务内，失败整体回滚。
+        if self.flags.get("consolidation_dedup", False):
+            self._consolidate_after_add(con, user_id, session_id, new_ids, normalized, now)
+
         return (AddResult(
             request_id=request_id,
             user_id=user_id,
@@ -489,6 +597,99 @@ class RetrieverDB:
             message_ids=new_ids,
             idempotent=False,
         ), dense_docs)
+
+    # -------------------------------------------------------- consolidation
+    def _consolidate_after_add(self, con, user_id, session_id, new_ids, normalized, now):
+        """Consolidation N->1 deterministic dedup（仅 flags["consolidation_dedup"] 开启时调用）。
+
+        对每条新消息：计算其话题指纹（长度≥2 的 token 集合，与 supersession 同一基建），
+        在该用户已有活跃消息（consolidated=0）中找 containment ≥ 阈值且事件时间在窗口内的
+        匹配。当匹配数 ≥ N（consolidation_min_cluster）时，把「新消息 + 全部匹配」合并为
+        一条摘要视图：
+          - content   = 簇内事件时间最新的那条消息原文（keep the latest content）；
+          - source_ids= 簇内全部消息 ID 的并集（gold 按 source_message_ids 判定仍命中）；
+          - view_type = "consolidation"，view_id 由 (user_id, 排序后来源集合) 哈希确定（幂等）。
+        随后归档簇内全部原始消息：标记 consolidated=1 并从 FTS 删除，使其不再作为独立候选；
+        原始行仍保留于 messages 表供审计/回溯/source_ids 回指。
+
+        确定性：指纹、containment、时间窗、排序键均为纯函数，相同输入产出完全一致的
+        摘要 view_id 与 source_ids。批内已归档的新消息不再触发二次合并。
+        """
+        min_cluster = max(1, int(getattr(self.config, "consolidation_min_cluster", 3)))
+        window_s = max(0, int(getattr(self.config, "consolidation_time_window_seconds", 604800)))
+        min_overlap = float(getattr(self.config, "consolidation_min_overlap", 0.5))
+        max_scan = max(1, int(getattr(self.config, "consolidation_max_scan", 1000)))
+        archived_in_batch: set[str] = set()
+
+        for offset, mid in enumerate(new_ids):
+            if mid in archived_in_batch:
+                continue  # 已被批内更早的新消息合并归档，不重复触发
+            item = normalized[offset]
+            sig_new = self._supersession_signature(item["content"])
+            if not sig_new:
+                continue
+            # 新消息事件时间：ts_ms 优先，缺失时退化为 created_at（= now，即「刚写入」）
+            new_epoch = RetrieverDB._epoch_of({
+                "ts_ms": item["ts_ms"],
+                "created_at": _iso_from_ms(item["ts_ms"]) or now,
+            })
+            if new_epoch is None:
+                continue  # 无任何时间信息无法判窗，保守跳过
+
+            rows = con.execute(
+                "SELECT id, content, ts_ms, created_at, session_id FROM messages "
+                "WHERE user_id=? AND consolidated=0 AND id<>? "
+                "ORDER BY added_at DESC, seq DESC LIMIT ?",
+                (user_id, mid, max_scan),
+            ).fetchall()
+
+            matches: list[tuple] = []
+            for r in rows:
+                sig = self._supersession_signature(r["content"])
+                if not sig:
+                    continue
+                inter = len(sig_new & sig)
+                if not inter:
+                    continue
+                # containment（交集 / 较短一方）而非 Jaccard：与 supersession 一致，
+                # 真实近重复陈述长度差异不影响判定。
+                if inter / float(min(len(sig_new), len(sig))) < min_overlap:
+                    continue
+                ep = RetrieverDB._epoch_of(dict(r))
+                if ep is None:
+                    continue
+                if window_s > 0 and abs(ep - new_epoch) > window_s:
+                    continue
+                matches.append((ep, r["id"], r["content"], r["created_at"], r["session_id"]))
+
+            if len(matches) < min_cluster:
+                continue
+
+            # 簇 = 新消息 + 匹配的已有消息；最新内容 = 事件时间最大者（同时间按 id 稳定排序）
+            cluster = matches + [
+                (new_epoch, mid, item["content"], _iso_from_ms(item["ts_ms"]) or now, session_id)
+            ]
+            cluster.sort(key=lambda x: (x[0], x[1]))
+            latest = cluster[-1]
+            all_ids = sorted(c[1] for c in cluster)
+            view_id = _consolidation_view_id(user_id, all_ids)
+            # 幂等：同源集合的摘要已存在则跳过（防重复请求 / 批内二次触发）
+            if con.execute("SELECT 1 FROM views WHERE view_id=?", (view_id,)).fetchone() is not None:
+                continue
+            digest = hashlib.sha1((latest[2] or "").encode("utf-8")).hexdigest()
+            con.execute(
+                "INSERT OR REPLACE INTO views"
+                "(view_id,user_id,session_id,view_type,content,created_at,source_ids,start_seq,end_seq,content_hash) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?)",
+                (view_id, user_id, latest[4], "consolidation", latest[2],
+                 latest[3] or now, json.dumps(all_ids, ensure_ascii=False), -1, -1, digest),
+            )
+            self._index_doc(con, view_id, user_id, "consolidation", latest[2])
+            # 归档簇内全部原始消息：标记 + 从 FTS 移除（原始行保留于 messages 表）
+            for cid in all_ids:
+                con.execute("UPDATE messages SET consolidated=1 WHERE id=?", (cid,))
+                con.execute("DELETE FROM fts WHERE doc_id=?", (cid,))
+                archived_in_batch.add(cid)
 
     # ------------------------------------------------------------------ views
     def _session_rows(self, con, user_id, session_id, start, end) -> list[dict]:
@@ -591,7 +792,13 @@ class RetrieverDB:
         sql = (
             "SELECT doc_id, doc_type, rank FROM fts "
             "WHERE fts MATCH ? AND user_id=? "
-            + ("" if self.flags.get("views", True) else "AND doc_type='message' ")
+            + (
+                ""
+                if self.flags.get("views", True)
+                # views=False 时仍需召回 consolidation 摘要：它替代了已归档的原始消息，
+                # 排除它会导致该主题内容在 FTS 中彻底消失（归档消息已从 FTS 删除）。
+                else "AND doc_type IN ('message', 'consolidation') "
+            )
             + "ORDER BY rank LIMIT ?"
         )
         try:
@@ -606,10 +813,69 @@ class RetrieverDB:
             return []
         rows = con.execute(
             "SELECT id AS doc_id, 'message' AS doc_type FROM messages "
-            "WHERE user_id=? AND content LIKE ? LIMIT ?",
+            "WHERE user_id=? AND consolidated=0 AND content LIKE ? LIMIT ?",
             (user_id, needle, int(self.config.max_candidates)),
         ).fetchall()
         return [(r["doc_id"], r["doc_type"], 0.0) for r in rows]
+
+    # ---------------------------------------------------- fact-table search
+    @staticmethod
+    def _has_fact_relevant_intent(query: str) -> bool:
+        """判断查询是否适合检索事实表（knowledge_update / temporal 类）。
+
+        事实表对「问当前状态 / 问更新后的值 / 问某属性当前取值 / 问何时发生」
+        的查询最有增益：这些查询的答案取决于结构化事实的匹配，而非词面重合。
+        非目标查询不检索事实表，避免无谓的 FTS 开销。
+        """
+        return (
+            features.has_temporal_intent(query)
+            or features.has_current_value_intent(query)
+            or features.has_date_value_intent(query)
+            or features.has_update_cue(query)
+            or features.has_numeric_value_intent(query)
+        )
+
+    def _search_facts(
+        self, con: sqlite3.Connection, user_id: str, tokens: list[str]
+    ) -> dict[str, list[dict]]:
+        """检索事实表，返回 message_id -> [fact_dict, ...] 映射。
+
+        用查询 token 在 fts_facts 上做 OR 匹配，再回查 facts 表获取结构化字段。
+        事实表为空时返回空 dict——与纯词法路径完全等价。
+        """
+        expr = self._match_expr(tokens)
+        if not expr:
+            return {}
+        try:
+            rows = con.execute(
+                "SELECT fact_id FROM fts_facts WHERE fts_facts MATCH ? AND user_id=? LIMIT ?",
+                (expr, user_id, int(self.config.max_candidates)),
+            ).fetchall()
+        except sqlite3.OperationalError:
+            return {}
+        if not rows:
+            return {}
+        fact_ids = [r["fact_id"] for r in rows]
+        # 分块回查事实详情（避免 IN 子句过长）
+        matches: dict[str, list[dict]] = {}
+        chunk = 400
+        for i in range(0, len(fact_ids), chunk):
+            part = fact_ids[i : i + chunk]
+            ph = ",".join("?" * len(part))
+            fact_rows = con.execute(
+                f"SELECT message_id, subject, predicate, object, time_value, time_epoch "
+                f"FROM facts WHERE id IN ({ph}) AND user_id=?",
+                (*part, user_id),
+            ).fetchall()
+            for r in fact_rows:
+                matches.setdefault(r["message_id"], []).append({
+                    "subject": r["subject"],
+                    "predicate": r["predicate"],
+                    "object": r["object"],
+                    "time_value": r["time_value"],
+                    "time_epoch": r["time_epoch"],
+                })
+        return matches
 
     def search(
         self,
@@ -647,7 +913,15 @@ class RetrieverDB:
                     )
                 except Exception:
                     dense_candidates = []  # 稠密失败 → 纯词法路径，不改变语义
-            if not raw_candidates and not dense_candidates:
+
+            # LLM 事实抽取：对 knowledge_update/temporal 查询额外检索事实表。
+            # 事实表为空（flag 关闭 / API 不可用 / 无事实）时 fact_matches 为空，
+            # 不改变任何检索行为——与纯词法路径完全等价。
+            fact_matches: dict[str, list[dict]] = {}
+            if self.flags.get("fact_extraction", False) and self._has_fact_relevant_intent(query):
+                fact_matches = self._search_facts(con, user_id, tokens)
+
+            if not raw_candidates and not dense_candidates and not fact_matches:
                 return SearchResult(request_id=request_id, total=0, results=[])
             # 稠密候选与词法候选按 doc_id 合并去重（稠密补充词法漏掉的文档）
             merged: dict[str, tuple[str, str, float]] = {}
@@ -658,13 +932,25 @@ class RetrieverDB:
             raw_candidates = list(merged.values())
             records = self._load_records(con, user_id, raw_candidates)
 
+            # 事实匹配补充：词法召回遗漏但事实表命中的消息作为额外候选。
+            # 这些消息无 FTS rank（rank_map 中为 0.0），仅靠 fact_boost 提升进入排序。
+            if fact_matches:
+                existing_ids = {r["id"] for r in records}
+                extra_limit = int(getattr(self.config, "fact_extra_candidates", 10))
+                extra_ids = [mid for mid in fact_matches if mid not in existing_ids][:extra_limit]
+                if extra_ids:
+                    extra_raw = [(mid, "message", 0.0) for mid in extra_ids]
+                    extra_records = self._load_records(con, user_id, extra_raw)
+                    records.extend(extra_records)
+                    raw_candidates.extend(extra_raw)
+
         fts_order = [doc_id for doc_id, _t, _r in raw_candidates if _t != "dense"]
         dense_order = [doc_id for doc_id, _score in dense_candidates]
         rank_map = {doc_id: rank for doc_id, _t, rank in raw_candidates}
         if not records:
             return SearchResult(request_id=request_id, total=0, results=[])
 
-        scored = self._score(records, query, tokens, rank_map)
+        scored = self._score(records, query, tokens, rank_map, fact_matches=fact_matches)
 
         # vNext：实体消歧后的软重排必须发生在 RRF 融合前，
         # 这样 feature 路的排序会反映其增益；它从不删除任何候选。
@@ -800,7 +1086,7 @@ class RetrieverDB:
                 part = unknown_ids[i : i + chunk_u]
                 ph = ",".join("?" * len(part))
                 for r in con.execute(
-                    f"SELECT id FROM messages WHERE id IN ({ph}) AND user_id=?",
+                    f"SELECT id FROM messages WHERE id IN ({ph}) AND user_id=? AND consolidated=0",
                     (*part, user_id),
                 ).fetchall():
                     found_msg.add(r["id"])
@@ -813,7 +1099,7 @@ class RetrieverDB:
             ph = ",".join("?" * len(part))
             for r in con.execute(
                 f"SELECT id, 'message' AS view, role, content, created_at, ts_ms, abs_epoch, abs_granularity, abs_expression, partial_month, partial_day, partial_expression, has_temporal_expr, session_id, seq "
-                f"FROM messages WHERE id IN ({ph}) AND user_id=?",
+                f"FROM messages WHERE id IN ({ph}) AND user_id=? AND consolidated=0",
                 (*part, user_id),
             ).fetchall():
                 rec = dict(r)
@@ -838,7 +1124,7 @@ class RetrieverDB:
                 out.append(rec)
         return out
 
-    def _score(self, records, query, tokens, rank_map) -> list[dict]:
+    def _score(self, records, query, tokens, rank_map, fact_matches=None) -> list[dict]:
         q_lower = (query or "").lower()
         numbers = features.extract_numbers(query)
         dates = features.extract_dates(query)
@@ -898,7 +1184,8 @@ class RetrieverDB:
         stamps = [self._epoch_of(rec) for rec in records]
         known = [s for s in stamps if s is not None]
         ts_min = min(known) if known else None
-        ts_span = (max(known) - ts_min) if known else 0.0
+        ts_max = max(known) if known else None
+        ts_span = (ts_max - ts_min) if known else 0.0
         for rec in records:
             content_lower = (rec["content"] or "").lower()
             score = 0.0
@@ -950,7 +1237,17 @@ class RetrieverDB:
                         flags.append("adjacent_evidence")
                 epoch = self._epoch_of(rec)
                 if epoch is not None:
-                    if ts_span > 0:
+                    if self.flags.get("ebbinghaus_decay", False):
+                        # Ebbinghaus 指数遗忘：recency = exp(-λ·Δt)，Δt 为该事实距候选集
+                        # 内最新事件的天数（以最新事件为「上次访问」参考点）。锚定候选集而非
+                        # 墙钟 now_ts：评测不注入查询时刻，绝对墙钟会让整批老语料的衰减值
+                        # 塌缩到 ~0 而丧失区分力，且结果随运行日期漂移不可复现。候选集相对
+                        # 锚定保持确定性，且与线性基线共享「最新=1.0」锚点，A/B 仅隔离曲线
+                        # 形状（线性 vs 指数）。
+                        lam = float(getattr(self.config, "decay_lambda", 0.1))
+                        days_since = max(0.0, (ts_max - epoch) / 86400.0)
+                        relative = math.exp(-lam * days_since)
+                    elif ts_span > 0:
                         relative = (epoch - ts_min) / ts_span
                     else:
                         relative = 1.0
@@ -965,6 +1262,8 @@ class RetrieverDB:
                         confidence_name = getattr(confidence, "name", "UNKNOWN").lower()
                         flags.append(f"temporal:{source}:{confidence_name}")
                     score += effective_recency_weight * relative
+                    if self.flags.get("ebbinghaus_decay", False):
+                        flags.append("ebbinghaus_decay")
                     flags.append("recency_intent" if temporal_intent else "recency")
                 elif self.flags.get("temporal_fallback", False):
                     # 已启用新兜底但仍无可排序的时间信息：显式不加新近度，
@@ -978,6 +1277,17 @@ class RetrieverDB:
 
             rec["score"] = score
             rec["flags"] = flags
+
+        # LLM 事实匹配提升：对事实表命中的消息做分数提升（在 RRF 融合前生效，
+        # 使 feature 路排序反映事实增益）。只提升、不删除、不改写原文。
+        # fact_matches 为空（flag 关闭 / 无事实 / 非目标查询）时零行为变化。
+        if fact_matches:
+            weight = float(getattr(self.config, "fact_boost_weight", 25.0))
+            for rec in records:
+                if rec["id"] in fact_matches:
+                    rec["score"] += weight
+                    if "fact_match" not in rec["flags"]:
+                        rec["flags"].append("fact_match")
 
         if (
             self.flags.get("preference_role_boost", False)
@@ -1445,6 +1755,8 @@ class RetrieverDB:
             con.execute("DELETE FROM views WHERE user_id=?", (user_id,))
             con.execute("DELETE FROM requests WHERE user_id=?", (user_id,))
             con.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
+            con.execute("DELETE FROM fts_facts WHERE user_id=?", (user_id,))
+            con.execute("DELETE FROM facts WHERE user_id=?", (user_id,))
             try:  # dense_vectors 表惰性创建；未启用稠密通道时可能不存在
                 con.execute("DELETE FROM dense_vectors WHERE user_id=?", (user_id,))
             except sqlite3.OperationalError:
@@ -1463,12 +1775,14 @@ class RetrieverDB:
             try:  # dense_vectors 表惰性创建；未启用稠密通道时可能不存在
                 con.executescript(
                     "DELETE FROM fts; DELETE FROM messages; DELETE FROM views; "
-                    "DELETE FROM requests; DELETE FROM sessions; DELETE FROM dense_vectors;"
+                    "DELETE FROM requests; DELETE FROM sessions; DELETE FROM dense_vectors; "
+                    "DELETE FROM fts_facts; DELETE FROM facts;"
                 )
             except sqlite3.OperationalError:
                 con.executescript(
                     "DELETE FROM fts; DELETE FROM messages; DELETE FROM views; "
-                    "DELETE FROM requests; DELETE FROM sessions;"
+                    "DELETE FROM requests; DELETE FROM sessions; "
+                    "DELETE FROM fts_facts; DELETE FROM facts;"
                 )
             return {"deleted_messages": n}
 
@@ -1497,6 +1811,7 @@ class RetrieverDB:
             return {
                 "messages": con.execute("SELECT COUNT(*) FROM messages").fetchone()[0],
                 "views": con.execute("SELECT COUNT(*) FROM views").fetchone()[0],
+                "facts": con.execute("SELECT COUNT(*) FROM facts").fetchone()[0],
                 "users": con.execute("SELECT COUNT(DISTINCT user_id) FROM messages").fetchone()[0],
                 "sessions": con.execute("SELECT COUNT(*) FROM sessions").fetchone()[0],
                 "db_path": self.db_path,

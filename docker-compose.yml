@@ -1,0 +1,102 @@
+# docker-compose.yml — Hosted deployment scaffold for the just-agent
+# Agent Memory Leaderboard submission endpoint.
+#
+# Brings up the synchronous Add/Search HTTP service with persistent SQLite
+# storage, bearer authentication, and an unauthenticated /health probe that
+# the official evaluation harness polls for reachability.
+#
+# Quick start:
+#   1. cp .env.example .env   # then edit .env (SC_API_KEY, AML_API_KEY, …)
+#   2. docker compose up -d --build
+#   3. curl -fsS http://127.0.0.1:${AML_HOST_PORT:-8080}/health
+#
+# Full instructions, including the Evaluation access form fields, live in
+# DEPLOY.md. This file is scaffolding only; it does not deploy to a remote
+# host or provision TLS — see DEPLOY.md § "Exposing to the evaluation
+# environment" for the reverse-proxy / TLS step.
+
+services:
+  aml-retriever:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Override with a pre-built image if you prefer not to build locally:
+    #   image: ghcr.io/your-org/flowgrid-aml-retriever:latest
+    image: flowgrid-aml-retriever:hosted
+    container_name: aml-retriever
+    restart: unless-stopped
+
+    # The container always listens on 8080 (AML_PORT in the Dockerfile ENV).
+    # Map a different host port with AML_HOST_PORT in .env.
+    ports:
+      - "${AML_HOST_PORT:-8080}:8080"
+
+    environment:
+      # ---- HTTP transport (see aml_retriever/config.py) ------------------
+      AML_HOST: "0.0.0.0"
+      AML_PORT: "8080"
+      AML_DB_PATH: "/data/aml.db"
+
+      # Auth: bearer | token | x-api-key  (none is for local smoke only —
+      # the official evaluation requires a real credential on Add/Search).
+      AML_AUTH_MODE: "${AML_AUTH_MODE:-bearer}"
+      AML_API_KEY: "${AML_API_KEY:?AML_API_KEY must be set in .env}"
+
+      # Official contract: request/response shape is path-independent, so the
+      # three paths may be relocated. Defaults match the documented contract.
+      AML_ADD_PATH: "${AML_ADD_PATH:-/add}"
+      AML_SEARCH_PATH: "${AML_SEARCH_PATH:-/search}"
+      AML_HEALTH_PATH: "${AML_HEALTH_PATH:-/health}"
+
+      # Concurrency knobs (official disclosed: Add 64 workers / Search 32).
+      # pool_size is the read-connection pool; 24 leaves borrow/return margin.
+      AML_POOL_SIZE: "${AML_POOL_SIZE:-24}"
+      AML_BUSY_TIMEOUT_MS: "${AML_BUSY_TIMEOUT_MS:-10000}"
+
+      # ---- LLM fact-extraction pipeline (flag-gated, default OFF) --------
+      # SC_API_KEY / SC_API_BASE are consumed by the fact-extraction module
+      # ONLY when AML_FLAG_FACT_EXTRACTION=1. With the flag off (default) the
+      # service runs the deterministic lexical-only path and these two vars
+      # are simply ignored. Secrets must come from .env — never bake them
+      # into the image.
+      SC_API_KEY: "${SC_API_KEY:-}"
+      SC_API_BASE: "${SC_API_BASE:-https://api.scnet.cn/v1}"
+      # AML_FLAG_FACT_EXTRACTION maps to the `fact_extraction` ablation flag.
+      # It is a no-op until that flag is added to DEFAULT_FLAGS (see the
+      # fact-extraction pipeline task); setting it here is forward-compatible.
+      AML_FLAG_FACT_EXTRACTION: "${AML_FLAG_FACT_EXTRACTION:-0}"
+
+    volumes:
+      # Persistent SQLite store survives container recreation.
+      # For file-backed SQLite, also remove the -wal/-shm sidecars on
+      # teardown — see docs/DATA_LIFECYCLE.md.
+      - aml-data:/data
+
+    healthcheck:
+      # Mirrors the Dockerfile HEALTHCHECK: unauthenticated GET /health,
+      # any 2xx is healthy. Kept explicit in compose so `docker compose ps`
+      # reports a live status without relying on the image-level check.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,os,sys; sys.exit(0 if 200 <= urllib.request.urlopen('http://127.0.0.1:'+os.environ.get('AML_PORT','8080')+'/health', timeout=4).status < 300 else 1)"
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+    logging:
+      # The server only ever logs method/path/status/latency — never memory
+      # content (see server.py _trace / log_message). Rotation caps disk use.
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  aml-data:
+    # Named volume — docker compose manages its on-disk location.
+    # Use a bind mount instead if you need a fixed host path:
+    #   volumes: [ "./data:/data" ]
+    driver: local

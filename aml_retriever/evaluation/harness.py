@@ -42,7 +42,10 @@ _L11 = {**_L9, "temporal_fallback": True, "content_timestamp_prefix": True}
 # 证据：locomo10 全量 MRR 0.6203→0.6324（+0.0121）、合成 L9 0.6854→0.7281。
 # preference_role_boost 曾于 0eeca8b 默认启用（声称 PersonaMem MRR +0.261），
 # 后经同样本配对（50/100/200 三档逐位一致）证明为样本方差伪信号 → 已回退默认关闭。
-_L12 = {**_L11, "preference_role_boost": False}
+# ebbinghaus_decay / consolidation_dedup 已通过授权数据门禁提升为默认 ON，故生产档
+# L12 必须与 DEFAULT_FLAGS 一致（test_production_stage_matches_default_flags 校验）。
+_L12 = {**_L11, "preference_role_boost": False,
+        "ebbinghaus_decay": True, "consolidation_dedup": True}
 
 # v1.4 候选（内容塑形，默认关闭，探针/门禁见 DECISIONS.md）：
 # L13：顺序意图查询按事件时间重排 + [事件N] 序号前缀（BEAM event_ordering 探针正信号）

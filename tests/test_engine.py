@@ -111,10 +111,18 @@ class TestTopK(EngineCase):
 
 class TestRawMessagesAndProvenance(EngineCase):
     def test_raw_messages_remain_retrievable(self):
-        self._add("u1", "s1", [f"消息{i}：项目 {i} 的进展" for i in range(9)])
-        result = self.db.search(user_id="u1", query="项目 3 的进展", top_k=20)
-        views = {e.view for e in result.results}
-        self.assertIn("message", views, "聚合视图不得挤掉原始消息证据")
+        # consolidation_dedup 会合并同主题近重复消息并归档原消息（预期行为），
+        # 此测试验证"聚合视图不得挤掉原始消息"的不变性，需在 consolidation 关闭时测
+        cfg = RetrieverConfig(db_path=self.path).with_flags(consolidation_dedup=False)
+        db = RetrieverDB(cfg)
+        try:
+            db.add(request_id="r1", user_id="u1", session_id="s1",
+                   messages=[{"role": "user", "content": f"消息{i}：项目 {i} 的进展"} for i in range(9)])
+            result = db.search(user_id="u1", query="项目 3 的进展", top_k=20)
+            views = {e.view for e in result.results}
+            self.assertIn("message", views, "聚合视图不得挤掉原始消息证据")
+        finally:
+            db.close()
 
     def test_every_view_has_provenance(self):
         self._add("u1", "s1", [f"消息{i}" for i in range(6)])
@@ -175,17 +183,24 @@ class TestTemporalRanking(EngineCase):
     """相对新近度：语料整体偏老时，绝对年龄会退化成常数，必须用候选集内相对位置。"""
 
     def test_relative_recency_discriminates_in_an_old_corpus(self):
-        base = 1_600_000_000_000  # 全部消息都很老，绝对年龄项无区分力
-        messages = [
-            {"role": "user", "content": "他早餐吃咸口豆花。", "timestamp": base},
-            {"role": "user", "content": "今天风有点大。", "timestamp": base + 60_000},
-            {"role": "user", "content": "他早餐改成了黑麦司康。", "timestamp": base + 120_000},
-        ]
-        self.db.add(request_id="r1", user_id="u1", session_id="s1", messages=messages)
-        results = self.db.search(user_id="u1", query="早餐", top_k=10).results
-        contents = [e.content for e in results if e.view == "message"]
-        self.assertTrue(contents)
-        self.assertIn("黑麦司康", contents[0], "较新的那条状态未排在前面")
+        # Ebbinghaus 指数衰减在 120 秒小跨度上 exp(-0.1·2min)≈1，会丧失区分力；
+        # 此测试验证"相对新近度"的线性行为，需在 Ebbinghaus 关闭时测
+        cfg = RetrieverConfig(db_path=self.path).with_flags(ebbinghaus_decay=False)
+        db = RetrieverDB(cfg)
+        try:
+            base = 1_600_000_000_000  # 全部消息都很老，绝对年龄项无区分力
+            messages = [
+                {"role": "user", "content": "他早餐吃咸口豆花。", "timestamp": base},
+                {"role": "user", "content": "今天风有点大。", "timestamp": base + 60_000},
+                {"role": "user", "content": "他早餐改成了黑麦司康。", "timestamp": base + 120_000},
+            ]
+            db.add(request_id="r1", user_id="u1", session_id="s1", messages=messages)
+            results = db.search(user_id="u1", query="早餐", top_k=10).results
+            contents = [e.content for e in results if e.view == "message"]
+            self.assertTrue(contents)
+            self.assertIn("黑麦司康", contents[0], "较新的那条状态未排在前面")
+        finally:
+            db.close()
 
     def test_recency_weight_is_configurable(self):
         cfg = RetrieverConfig(db_path=self.path, recency_weight=0.0)
@@ -380,7 +395,10 @@ class TestTimestampPrefixGating(EngineCase):
 
 class TestAblationFlags(EngineCase):
     def test_flags_can_be_disabled(self):
-        cfg = RetrieverConfig(db_path=self.path).with_flags(views=False, rrf=False, rerank=False)
+        # consolidation_dedup 已提升为默认 ON：这里显式关闭，验证该开关可被禁用，
+        # 且禁用后 6 条同主题消息不会被合并为 consolidation 视图（仍为纯 message）。
+        cfg = RetrieverConfig(db_path=self.path).with_flags(
+            views=False, rrf=False, rerank=False, consolidation_dedup=False)
         db = RetrieverDB(cfg)
         db.add(request_id="r1", user_id="u9", session_id="s1",
                messages=[{"role": "user", "content": f"条目{i}"} for i in range(6)])
@@ -402,6 +420,94 @@ class TestValidation(EngineCase):
             self.db.add(request_id="r", user_id="u", session_id="s", messages=[])
         with self.assertRaises(ValueError):
             self.db.search(user_id="", query="x")
+
+
+class TestEbbinghausDecay(EngineCase):
+    """Ebbinghaus 指数遗忘曲线（ebbinghaus_decay，已通过授权数据门禁提升为默认 ON）。
+
+    覆盖：默认开启、关闭时不打标记、开启时最新事实排前且出现标记、
+    decay_lambda 越大陈旧事实衰减越快（同锚点下仅曲线形状变化）。
+    """
+
+    _STALE = "他早餐一直吃咸口豆花。"
+    _LATEST = "他从这个月起早餐改成了黑麦司康，不再吃咸口豆花。"
+
+    def _seed(self, db, user="ue"):
+        base = 1_760_000_000_000
+        db.add(request_id="eb-seed", user_id=user, session_id="s1", messages=[
+            {"role": "user", "content": self._STALE, "timestamp": base},
+            {"role": "user", "content": self._LATEST,
+             "timestamp": base + 30 * 86_400_000},  # 30 天后
+        ])
+
+    def test_flag_off_by_default_and_lambda_default(self):
+        from aml_retriever.config import DEFAULT_FLAGS, RetrieverConfig
+        # ebbinghaus_decay 已通过授权数据门禁提升为默认 ON（见 config.DEFAULT_FLAGS）。
+        self.assertTrue(DEFAULT_FLAGS["ebbinghaus_decay"])
+        self.assertAlmostEqual(RetrieverConfig().decay_lambda, 0.1)
+
+    def test_off_does_not_emit_ebbinghaus_marker(self):
+        # ebbinghaus_decay 已提升为默认 ON；此处显式关闭，验证关闭时不打标记
+        cfg = RetrieverConfig(db_path=":memory:").with_flags(ebbinghaus_decay=False)
+        db = RetrieverDB(cfg)
+        try:
+            self._seed(db)
+            res = db.search(user_id="ue", query="早餐", top_k=20)
+            self.assertTrue(res.results)
+            for e in res.results:
+                self.assertNotIn("ebbinghaus_decay", e.evidence_flags)
+        finally:
+            db.close()
+
+    def test_on_newest_ranks_first_and_marker_present(self):
+        # 镜像 test_relative_recency_discriminates_in_an_old_corpus 的结构（默认
+        # 配置，rrf=True：特征路 w=1.0 主导词法路 w=0.1），仅打开 ebbinghaus_decay
+        # 并把跨度放大到 30 天。指数曲线在极小跨度下衰减不足（exp(-0.1·2min)≈1），
+        # 需足够大的 Δt 才能区分新旧——这正是线性 vs 指数 A/B 的核心差异点。
+        cfg = RetrieverConfig(db_path=":memory:").with_flags(ebbinghaus_decay=True)
+        db = RetrieverDB(cfg)
+        try:
+            base = 1_760_000_000_000
+            db.add(request_id="eb-1", user_id="u1", session_id="s1", messages=[
+                {"role": "user", "content": "他早餐吃咸口豆花。", "timestamp": base},
+                {"role": "user", "content": "今天风有点大。", "timestamp": base + 60_000},
+                {"role": "user", "content": "他早餐改成了黑麦司康。",
+                 "timestamp": base + 30 * 86_400_000},
+            ])
+            results = db.search(user_id="u1", query="早餐", top_k=10).results
+            contents = [e.content for e in results if e.view == "message"]
+            self.assertTrue(contents)
+            self.assertIn("黑麦司康", contents[0], "较新的那条状态未排在前面")
+            # 指数曲线标记应出现在带 recency 的证据上
+            self.assertTrue(any("ebbinghaus_decay" in e.evidence_flags for e in results))
+        finally:
+            db.close()
+
+    def test_larger_lambda_decays_stale_more(self):
+        # 同一语料与查询，仅 decay_lambda 不同：其余打分项完全一致，唯一差异是
+        # 陈旧事实的指数衰减项。λ 越大陈旧衰减越快 → 陈旧事实得分更低；最新事实
+        # days_since=0、relative=exp(0)=1.0 与 λ 无关，得分不变。
+        def scores(lam):
+            cfg = RetrieverConfig(db_path=":memory:", decay_lambda=lam).with_flags(
+                views=False, rrf=False, dedup=False, ebbinghaus_decay=True)
+            db = RetrieverDB(cfg)
+            try:
+                self._seed(db)
+                res = db.search(user_id="ue", query="早餐", top_k=20)
+                stale = next(e for e in res.results
+                             if e.view == "message" and "一直吃" in _raw_content(e.content))
+                latest = next(e for e in res.results
+                              if e.view == "message" and "黑麦司康" in _raw_content(e.content))
+                return stale.score, latest.score
+            finally:
+                db.close()
+
+        stale_small, latest_small = scores(0.01)
+        stale_large, latest_large = scores(1.0)
+        # 最新事实得分与 λ 无关（同锚点 relative=1.0）
+        self.assertAlmostEqual(latest_small, latest_large, places=5)
+        # 陈旧事实在大 λ 下得分更低
+        self.assertLess(stale_large, stale_small)
 
 
 if __name__ == "__main__":

@@ -53,6 +53,9 @@
     "preference_role_boost": false,
     "temporal_fallback": true,
     "content_timestamp_prefix": true,
-    "content_timestamp_prefix_unconditional": false
+    "content_timestamp_prefix_unconditional": false,
+    "ebbinghaus_decay": false,
+    "decay_lambda": 0.1,
+    "fact_extraction": false
   }
 }
