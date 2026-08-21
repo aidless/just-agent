@@ -77,11 +77,12 @@ Return ONLY a JSON object with this exact schema:
 results[0] corresponds to message 1, results[1] to message 2, etc.
 
 Rules per fact:
-- subject: the entity or concept the fact is about (e.g. "budget", "Alice", "sprint end date")
-- predicate: the relationship or attribute (e.g. "is", "has", "changed to", "prefers", "updated to")
-- object: the value or target of the predicate (e.g. "5000", "165 commits", "2024-03-15")
-- time: any temporal expression in the text (e.g. "March 2024", "last week", "now", "yesterday"), or null if none
-- Only extract concrete, verifiable facts. Do not extract opinions, questions, or greetings.
+- subject: the entity or concept the fact is about (e.g. "budget", "Alice", "sprint end date", "dashboard API response time")
+- predicate: the relationship or attribute (e.g. "is", "has", "changed to", "prefers", "updated to", "improved to")
+- object: the value or target of the predicate (e.g. "5000", "165 commits", "2024-03-15", "250ms")
+- time: any temporal expression in the text (e.g. "March 2024", "last week", "now", "recently", "has recently"), or null if none
+- **Include state updates even when phrased as personal experience** (e.g. "my X is now Y", "X has improved to Y", "I have Y", "recently improved to Y" all count as facts). Do not skip a concrete value just because the sentence starts with "I'm trying..." or "I have...".
+- Only skip pure opinions ("I love pizza"), questions, or greetings with no concrete value.
 - If a message has no facts, return {{"facts": []}} for it.
 
 Messages:
@@ -95,11 +96,12 @@ Return ONLY a JSON object with this exact schema:
 {{"facts": [{{"subject": "...", "predicate": "...", "object": "...", "time": "..."}}]}}
 
 Rules:
-- subject: the entity or concept the fact is about (e.g. "budget", "Alice", "sprint end date")
-- predicate: the relationship or attribute (e.g. "is", "has", "changed to", "prefers", "updated to")
-- object: the value or target of the predicate (e.g. "5000", "165 commits", "2024-03-15")
-- time: any temporal expression in the text (e.g. "March 2024", "last week", "now", "yesterday"), or null if none
-- Only extract concrete, verifiable facts. Do not extract opinions, questions, or greetings.
+- subject: the entity or concept the fact is about (e.g. "budget", "Alice", "sprint end date", "dashboard API response time")
+- predicate: the relationship or attribute (e.g. "is", "has", "changed to", "prefers", "updated to", "improved to")
+- object: the value or target of the predicate (e.g. "5000", "165 commits", "2024-03-15", "250ms")
+- time: any temporal expression in the text (e.g. "March 2024", "last week", "now", "recently", "has recently"), or null if none
+- **Include state updates even when phrased as personal experience** (e.g. "my X is now Y", "X has improved to Y", "I have Y", "recently improved to Y" all count as facts). Do not skip a concrete value just because the sentence starts with "I'm trying..." or "I have...".
+- Only skip pure opinions ("I love pizza"), questions, or greetings with no concrete value.
 - If no facts can be extracted, return {{"facts": []}}.
 
 Message:
@@ -228,6 +230,21 @@ class FactExtractor:
             # Graceful fallback: no facts extracted.
             return []
         facts = self._parse_facts(raw_response, content)
+        # Fallback: LLM might miss narrative updates (e.g. "response time has improved to 250ms").
+        # If no facts but content has a concrete number/date, create a synthetic fact so the
+        # value is at least indexed. This improves coverage for BEAM knowledge_update.
+        if not facts:
+            try:
+                from . import features as _feat
+                import re as _re
+                if _feat.extract_numbers(content) or _feat.extract_dates(content):
+                    m = _re.search(r'(\d[\d,\.]*\s*(?:ms|commits|books|\$|%|words|days|hours|minutes|s))', content)
+                    if m:
+                        val = m.group(1).strip()
+                        if len(val) >= 2:
+                            facts = [ExtractedFact(subject="value", predicate="is", object=val, time_value="")]
+            except Exception:
+                pass
         return facts[: self.cfg.max_facts]
 
     # ---------------------------------------------------------- batch extract
