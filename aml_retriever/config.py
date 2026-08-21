@@ -82,6 +82,11 @@ DEFAULT_FLAGS: dict[str, bool] = {
     # 稠密索引是否包含聚合视图（默认 False：只嵌原始消息，视图内容蕴含在
     # 消息里，嵌入长拼接视图会显著拖慢 Add）。只影响索引内容，不影响语义。
     "dense_index_views": False,
+    # nomic-embed-text 稠密检索通道（ollama 本地，默认关闭）。与 dense (fastembed
+    # bge-small) 不同：使用本地 ollama 的 nomic-embed-text 模型（768 维，1.82s/批，
+    # 区分力 0.93 vs bge-small 0.39）。后端不可用时静默回退纯确定性路径。作为第 3
+    # 路 RRF 通道与词法/特征路融合。向量按 user_id 隔离，存于独立 nomic_vectors 表。
+    "dense_nomic": False,
     # 返回 content 前给证据加 [事件时间] 前缀（v1.2 默认启用；日期级，不改
     # 原文、不改排序）。官方答案指令允许“memory timestamp 明确时把相对时间
     # 转成日期”，而 Search 只把 content 喂给答案模型。端到端（DeepSeek 官网
@@ -128,6 +133,50 @@ DEFAULT_FLAGS: dict[str, bool] = {
     # 超时、响应异常）静默回退纯词法路径——与关闭 flag 观察等价，只是不会出现 fact_match
     # 证据标记。凭据从环境变量 SC_API_KEY / SC_API_BASE 读取，绝不硬编码。
     "fact_extraction": False,
+    # v1.4 候选：实体边图 BFS 扩展（默认关闭）。Add 阶段用 features.extract_entities 提取
+    # 每条消息的实体，在 entity_edges 表中建立共享实体的邻接边（src_id, dst_id, shared_entity,
+    # weight）。Search 阶段若查询含实体，从已召回的消息种子出发做 BFS（深度 graph_max_depth），
+    # 收集未召回的邻居消息 ID 作为额外候选并加分提升。动机：词法召回只命中直接匹配查询
+    # token 的消息，而通过共享实体的图邻居（如"Alice 工作在 Project Alpha"→"Project Alpha
+    # 用 Python"）可能携带答案但未被 FTS 召回。纯确定性、零新依赖（复用现有实体提取）。
+    "entity_graph": False,
+    # 知识图谱多跳桥接（kg_graph，默认关闭，消融中）。与 entity_graph（消息-消息邻接边
+    # BFS 扩展）不同：kg_graph 在 entity-entity 层建图——Add 阶段对每条消息用
+    # features.extract_entities 提取实体，在同一消息内共现的实体对之间建立无向边，存入
+    # kg_edges(entity_a, entity_b, message_id, user_id)。Search 阶段若查询含 ≥2 个实体，
+    # 找出「桥接实体」——即与 ≥2 个查询实体分别在不同消息中共现的实体（HippoRAG PPR /
+    # YourMemory entity graph 的简化版），把这些桥接实体所连接的消息作为额外候选召回并
+    # 加分提升。动机：多跳问题（"Alice 和 Bob 通过什么项目联系？"）的答案散落在多条
+    # 消息里，词法召回只命中直接匹配查询 token 的消息，而桥接实体（如共享的 Project X）
+    # 把分散证据串成推理链。纯确定性、零新依赖（复用 features.extract_entities）。
+    "kg_graph": False,
+    # Entity-level functional contradiction resolution（默认关闭，消融中）。
+    # Search 阶段：按主实体分组候选消息，检测同实体同谓词的值矛盾（不同数值/日期）
+    # 或极性矛盾（一肯定一否定 via has_negation），标记较早的消息为 superseded。
+    # 对 current-value 查询（has_current_value_intent / has_temporal_intent）从结果中
+    # 过滤 superseded 消息，使答案模型只看到最新值。与 supersession 的区别：
+    # supersession 基于话题指纹重合 + 时间先后，只在 temporal_intent 查询时做软提升/轻降；
+    # 本方法基于实体级谓词匹配（排除实体/值 token 后的谓词签名），更精确地定位功能矛盾，
+    # 且对 current-value 查询做硬过滤（删除而非降权）。
+    "entity_contradiction": False,
+    # entity_contradiction_filter（默认关闭，消融中）：实体级极性矛盾过滤。
+    # Search 阶段：按主实体分组候选消息，检测同实体同谓词（排除实体/值 token 后的
+    # 谓词签名重合 ≥ entity_contradiction_min_overlap）且极性相反（一肯定一否定
+    # via has_negation）的消息对，标记较早的消息为 superseded。对 current-value
+    # 查询（has_current_value_intent）从结果中硬过滤 superseded 消息，使答案模型
+    # 只看到最新值；对非 current-value 查询仅提升较新消息分数（不过滤）。
+    # 与 entity_contradiction 的区别：后者是更宽泛的占位（含数值/日期矛盾），
+    # 本 flag 专注于极性矛盾（has_negation）的精确检测与硬过滤。复用
+    # entity_contradiction_min_overlap / entity_contradiction_weight 参数。
+    "entity_contradiction_filter": False,
+    # date_channel（默认关闭，消融中）：日期窗口检索通道。当查询含显式日期时，
+    # 额外检索 event_time 落在该日期窗口内的消息（不依赖词法匹配），作为独立的
+    # RRF 通道与词法/特征路融合。针对词法漏召回但时间匹配的日期类问题。
+    "date_channel": False,
+    # recency_sort（默认关闭，消融中）：对 current-value / temporal 查询，
+    # 将证据按 event_time DESC 硬排序后取 head。当前状态问题的答案是最新的
+    # 陈述，硬排序比软权重更直接地保证最新证据进入 top-k 前位。
+    "recency_sort": False,
 }
 
 
@@ -158,6 +207,18 @@ class RetrieverConfig:
     dense_top_n: int = 80          # 稠密通道候选数
     dense_rrf_weight: float = 0.5  # 三路 RRF 中稠密通道的权重（词法 0.1 / 特征 1.0）
     dense_model: str = "BAAI/bge-small-en-v1.5"
+
+    # nomic 稠密通道参数（仅在 flags["dense_nomic"] 开启时生效）
+    # nomic_model       : ollama 模型名（本地 nomic-embed-text，768 维，1.82s/批）
+    # nomic_ollama_url  : ollama API 基址（/api/embed 端点，支持批量输入）
+    # nomic_rrf_weight  : RRF 融合中 nomic 通道的权重（与词法/特征/稠密/日期路并列）
+    # nomic_top_n       : nomic 通道返回的候选数（界定 Search 热路径成本）
+    # nomic_timeout     : ollama API 超时秒数；超时静默回退，不阻塞 Add/Search
+    nomic_model: str = "nomic-embed-text"
+    nomic_ollama_url: str = "http://127.0.0.1:11434"
+    nomic_rrf_weight: float = 0.5
+    nomic_top_n: int = 80
+    nomic_timeout: float = 30.0
 
     # 加权 RRF 融合参数（仅在 flags["rrf"] 开启时生效）。
     # 权重扫描（docs/EVAL.md 附录 A）显示：w_lexical 越大 MRR 越高、Recall@20 越低。
@@ -204,12 +265,31 @@ class RetrieverConfig:
     # fact_extraction_timeout   : API 超时秒数；超时静默回退，不阻塞 Add。
     # fact_max_per_message      : 每条消息最多抽取/存储的事实数（控制 Add 延迟与表体积）。
     # fact_extra_candidates     : Search 时从事实表补充的、词法召回遗漏的最大消息数。
-    # 凭据 SC_API_KEY / SC_API_BASE 从环境变量读取，不在此处配置。
+    # 凭据 OPEN_API_KEY / OPEN_API_BASE 从环境变量读取，不在此处配置。
     fact_boost_weight: float = 25.0
-    fact_extraction_model: str = "kimi-k2.5"
-    fact_extraction_timeout: float = 5.0
+    fact_extraction_model: str = "muse-spark-1.2-contributor"
+    fact_extraction_timeout: float = 30.0
     fact_max_per_message: int = 8
     fact_extra_candidates: int = 10
+
+    # 实体边图 BFS 扩展参数（仅在 flags["entity_graph"] 开启时生效）。
+    # graph_max_depth     : BFS 最大深度（1=只找直接邻居，2=两跳邻居）。
+    # graph_max_expansion : BFS 最多补充的额外候选数（界定 Search 热路径成本）。
+    # graph_boost_weight  : 图扩展候选的分数提升量（深度越深提升越小：weight/depth）。
+    graph_max_depth: int = 2
+    graph_max_expansion: int = 5
+    graph_boost_weight: float = 15.0
+
+    # 知识图谱多跳桥接参数（仅在 flags["kg_graph"] 开启时生效）。
+    # kg_max_entities_per_message : 每条消息参与建边的实体上限（取 extract_entities 前 N 个，
+    #   控制全配对边数 O(N^2) 的最坏体积；CJK n-gram 噪声多，截断避免边表爆炸）。
+    # kg_max_bridge_messages      : 桥接实体连接的消息作为额外候选召回的最多条数（界定
+    #   Search 热路径成本；仅在 FTS 未召回时才补充）。
+    # kg_bridge_boost_weight      : 桥接消息的分数提升量（在 RRF 融合前的特征路生效）。
+    #   连接的查询实体越多，提升越大（weight × min(connected_query_entities, 3) / 3）。
+    kg_max_entities_per_message: int = 16
+    kg_max_bridge_messages: int = 10
+    kg_bridge_boost_weight: float = 15.0
 
     # 覆写检测参数（仅在 flags["supersession"] 开启时生效）。
     # min_overlap 是两条消息「谈的是同一件事」的判定阈值，按 containment
@@ -237,6 +317,24 @@ class RetrieverConfig:
     # vNext：实体消歧后的软提升。仅在 flags["entity_boost_v2"] 开启时生效。
     entity_disambiguation_weight: float = 35.0
     entity_cooccurrence_weight: float = 20.0
+
+    # Entity-level contradiction 参数（仅在 flags["entity_contradiction"] 开启时生效）。
+    # entity_contradiction_min_overlap: 同实体下两条消息的谓词签名重合阈值
+    #   （containment = 交集 / 较短一方 token 数；token 取长度≥2 且排除实体与值 token）。
+    #   低于此阈值视为不同谓词（如 budget vs phone number），不判矛盾。
+    # entity_contradiction_weight: 矛盾检测中较新消息（winner）的分数提升量，
+    #   使其在非 current-value 查询中也能排前；superseded 消息对 current-value
+    #   查询被硬过滤，不需要额外降权。
+    entity_contradiction_min_overlap: float = 0.4
+    entity_contradiction_weight: float = 4.0
+
+    # date_channel 参数（仅在 flags["date_channel"] 开启时生效）。
+    # date_channel_rrf_weight    : RRF 融合中日期通道的权重（与词法/特征/稠密路并列）。
+    # date_window_padding_days   : 日期窗口两侧扩展的天数（0 = 精确到当天 [00:00, 次日00:00)）。
+    # date_channel_max_candidates: 日期通道返回的最大候选数（界定 SQL 扫描成本）。
+    date_channel_rrf_weight: float = 0.5
+    date_window_padding_days: int = 0
+    date_channel_max_candidates: int = 50
 
     # vNext P2：仅对基础特征排名靠前的无 ts_ms 候选执行完整相对时间兜底。
     # 0 表示不限制；默认 80，保持候选覆盖同时控制 Search 热路径成本。
@@ -293,8 +391,24 @@ class RetrieverConfig:
             "AML_FACT_EXTRACTION_TIMEOUT": ("fact_extraction_timeout", float),
             "AML_FACT_MAX_PER_MESSAGE": ("fact_max_per_message", int),
             "AML_FACT_EXTRA_CANDIDATES": ("fact_extra_candidates", int),
+            "AML_GRAPH_MAX_DEPTH": ("graph_max_depth", int),
+            "AML_GRAPH_MAX_EXPANSION": ("graph_max_expansion", int),
+            "AML_GRAPH_BOOST_WEIGHT": ("graph_boost_weight", float),
+            "AML_KG_MAX_ENTITIES_PER_MESSAGE": ("kg_max_entities_per_message", int),
+            "AML_KG_MAX_BRIDGE_MESSAGES": ("kg_max_bridge_messages", int),
+            "AML_KG_BRIDGE_BOOST_WEIGHT": ("kg_bridge_boost_weight", float),
             "AML_ENTITY_DISAMBIGUATION_W": ("entity_disambiguation_weight", float),
             "AML_ENTITY_COOCCURRENCE_W": ("entity_cooccurrence_weight", float),
+            "AML_ENTITY_CONTRADICTION_MIN_OVERLAP": ("entity_contradiction_min_overlap", float),
+            "AML_ENTITY_CONTRADICTION_WEIGHT": ("entity_contradiction_weight", float),
+            "AML_DATE_CHANNEL_RRF_WEIGHT": ("date_channel_rrf_weight", float),
+            "AML_DATE_WINDOW_PADDING_DAYS": ("date_window_padding_days", int),
+            "AML_DATE_CHANNEL_MAX_CANDIDATES": ("date_channel_max_candidates", int),
+            "AML_NOMIC_MODEL": ("nomic_model", str),
+            "AML_NOMIC_OLLAMA_URL": ("nomic_ollama_url", str),
+            "AML_NOMIC_RRF_WEIGHT": ("nomic_rrf_weight", float),
+            "AML_NOMIC_TOP_N": ("nomic_top_n", int),
+            "AML_NOMIC_TIMEOUT": ("nomic_timeout", float),
             "AML_TEMPORAL_FALLBACK_TOP_N": ("temporal_fallback_top_n", int),
             "AML_TEMPORAL_FALLBACK_TOP_N_TEMPORAL": ("temporal_fallback_top_n_temporal", int),
             "AML_TEMPORAL_FALLBACK_TOP_N_OTHER": ("temporal_fallback_top_n_other", int),

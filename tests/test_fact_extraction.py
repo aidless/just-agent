@@ -52,8 +52,8 @@ class TestFactExtractionFlag(unittest.TestCase):
     def test_config_params_exist(self):
         cfg = RetrieverConfig()
         self.assertEqual(cfg.fact_boost_weight, 25.0)
-        self.assertEqual(cfg.fact_extraction_model, "kimi-k2.5")
-        self.assertEqual(cfg.fact_extraction_timeout, 5.0)
+        self.assertEqual(cfg.fact_extraction_model, "muse-spark-1.2-contributor")
+        self.assertEqual(cfg.fact_extraction_timeout, 30.0)
         self.assertEqual(cfg.fact_max_per_message, 8)
         self.assertEqual(cfg.fact_extra_candidates, 10)
 
@@ -67,7 +67,7 @@ class TestFactExtractor(unittest.TestCase):
         ext = FactExtractor(FactExtractionConfig(api_key="", api_base="https://x"))
         ok, reason = ext.available()
         self.assertFalse(ok)
-        self.assertIn("SC_API_KEY", reason)
+        self.assertIn("OPEN_API_KEY", reason)
 
     def test_no_api_key_returns_empty(self):
         ext = FactExtractor(FactExtractionConfig(api_key="", api_base="https://x"))
@@ -137,17 +137,17 @@ class TestFactExtractor(unittest.TestCase):
         self.assertEqual(fact2.fact_text(), "s p o")
 
     def test_from_config_uses_env(self):
-        os.environ["SC_API_KEY"] = "env-key-123"
-        os.environ["SC_API_BASE"] = "https://custom.example.com/v1"
+        os.environ["OPEN_API_KEY"] = "env-key-123"
+        os.environ["OPEN_API_BASE"] = "https://custom.example.com/v1"
         try:
             cfg = RetrieverConfig()
             ext = FactExtractor.from_config(cfg)
             self.assertEqual(ext.cfg.api_key, "env-key-123")
             self.assertEqual(ext.cfg.api_base, "https://custom.example.com/v1")
-            self.assertEqual(ext.cfg.model, "kimi-k2.5")
+            self.assertEqual(ext.cfg.model, "muse-spark-1.2-contributor")
         finally:
-            del os.environ["SC_API_KEY"]
-            del os.environ["SC_API_BASE"]
+            del os.environ["OPEN_API_KEY"]
+            del os.environ["OPEN_API_BASE"]
 
 
 # ---------------------------------------------------------------------------

@@ -30,7 +30,7 @@ from datetime import datetime, timezone
 
 from . import features
 from .config import RetrieverConfig
-from .dense import DenseIndex, backend_available
+from .dense import DenseIndex, NomicDenseIndex, backend_available, nomic_backend_available
 from .entity_disambiguate import apply_entity_boost_v2
 from .temporal_fallback import (
     TimeConfidence, confidence_to_recency_weight, extract_partial_month_day,
@@ -177,6 +177,7 @@ class RetrieverDB:
             self._shared_mem_con = self._new_connection()
 
         self._dense: DenseIndex | None = None
+        self._nomic_dense: NomicDenseIndex | None = None
         self._fact_ext = None  # 惰性初始化 LLM 事实抽取器（仅 flags["fact_extraction"] 开启时）
 
         self._init_schema()
@@ -192,6 +193,20 @@ class RetrieverDB:
         if self._dense is None:
             self._dense = DenseIndex(self)
         return self._dense
+
+    def _nomic_dense_index(self) -> NomicDenseIndex | None:
+        """惰性初始化 nomic 稠密索引（仅 flags["dense_nomic"] 开启时）。"""
+        if not self.flags.get("dense_nomic", False):
+            return None
+        ok, _ = nomic_backend_available(
+            ollama_url=getattr(self.config, "nomic_ollama_url", ""),
+            model=getattr(self.config, "nomic_model", ""),
+        )
+        if not ok:
+            return None
+        if self._nomic_dense is None:
+            self._nomic_dense = NomicDenseIndex(self)
+        return self._nomic_dense
 
     def _new_connection(self) -> sqlite3.Connection:
         con = sqlite3.connect(self.db_path, timeout=self.config.busy_timeout_ms / 1000.0,
@@ -343,6 +358,38 @@ class RetrieverDB:
                     fact_id UNINDEXED,
                     user_id UNINDEXED
                 );
+
+                -- 实体边图：共享实体的消息邻接关系（flags["entity_graph"] 开启时由 Add 填充）。
+                -- 每行代表一条无向边：src_id 与 dst_id 两条消息共享 shared_entity。
+                -- weight 固定 1.0（每个共享实体一条边）；Search 时 BFS 遍历此表发现图邻居。
+                CREATE TABLE IF NOT EXISTS entity_edges(
+                    src_id TEXT NOT NULL,
+                    dst_id TEXT NOT NULL,
+                    shared_entity TEXT NOT NULL,
+                    weight REAL NOT NULL DEFAULT 1.0,
+                    user_id TEXT NOT NULL,
+                    PRIMARY KEY(src_id, dst_id, shared_entity)
+                );
+                CREATE INDEX IF NOT EXISTS idx_entity_edges_user ON entity_edges(user_id);
+                CREATE INDEX IF NOT EXISTS idx_entity_edges_src ON entity_edges(src_id);
+                CREATE INDEX IF NOT EXISTS idx_entity_edges_dst ON entity_edges(dst_id);
+
+                -- 知识图谱边：实体-实体共现关系（flags["kg_graph"] 开启时由 Add 填充）。
+                -- 与 entity_edges（消息-消息邻接）不同：本表在 entity-entity 层建图。
+                -- 每行代表一条无向边——entity_a 与 entity_b 在同一 message_id 中共现。
+                -- 实体规范化为小写并按字典序排列（entity_a <= entity_b）以保证幂等。
+                -- Search 时按查询实体查共现邻居，找出连接多个查询实体的「桥接实体」。
+                CREATE TABLE IF NOT EXISTS kg_edges(
+                    entity_a TEXT NOT NULL,
+                    entity_b TEXT NOT NULL,
+                    message_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    weight REAL NOT NULL DEFAULT 1.0,
+                    PRIMARY KEY(entity_a, entity_b, message_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_kg_edges_user ON kg_edges(user_id);
+                CREATE INDEX IF NOT EXISTS idx_kg_edges_a ON kg_edges(entity_a, user_id);
+                CREATE INDEX IF NOT EXISTS idx_kg_edges_b ON kg_edges(entity_b, user_id);
                 """
             )
             # 兼容已有库：SQLite 没有 ADD COLUMN IF NOT EXISTS，故按 schema 自检后迁移。
@@ -412,6 +459,8 @@ class RetrieverDB:
         if isinstance(result, tuple) and len(result) == 2:
             add_result, dense_docs = result
             self._embed_dense_after_add(user_id, dense_docs)
+            # nomic 稠密通道：事务提交后嵌入 nomic 向量（网络调用，不占用写锁）。
+            self._embed_nomic_after_add(user_id, dense_docs)
             # LLM 事实抽取：事务提交后异步抽取（网络调用，不占用写锁）。
             # dense_docs = [(doc_id, content), ...]，复用已有的新消息内容列表。
             self._extract_facts_after_add(user_id, session_id, dense_docs)
@@ -429,6 +478,19 @@ class RetrieverDB:
             dense.add_docs(user_id, [d for d, _ in dense_docs], [c for _, c in dense_docs])
         except Exception:
             # 稠密通道失败不回滚已提交的写入；下次 Search 自动退回词法路径
+            pass
+
+    def _embed_nomic_after_add(self, user_id: str, dense_docs: list[tuple[str, str]]) -> None:
+        """事务提交后为新增文档嵌入 nomic 向量（网络调用，避免占用写锁）。"""
+        if not dense_docs:
+            return
+        nomic = self._nomic_dense_index()
+        if nomic is None:
+            return
+        try:
+            nomic.add_docs(user_id, [d for d, _ in dense_docs], [c for _, c in dense_docs])
+        except Exception:
+            # nomic 通道失败不回滚已提交的写入；下次 Search 自动退回词法路径
             pass
 
     # -------------------------------------------------------- fact extraction
@@ -590,6 +652,18 @@ class RetrieverDB:
         if self.flags.get("consolidation_dedup", False):
             self._consolidate_after_add(con, user_id, session_id, new_ids, normalized, now)
 
+        # 实体边图：为新消息建立共享实体的邻接边（默认关闭）。
+        # 必须在消息落库 + FTS 索引后执行：它通过 FTS 查找含相同实体的已有消息。
+        # consolidation 先于本步执行，已被归档的消息已从 FTS 移除，不会被选中为邻居。
+        if self.flags.get("entity_graph", False):
+            self._build_entity_edges(con, user_id, new_ids, normalized)
+
+        # 知识图谱边：为新消息建立实体-实体共现边（默认关闭）。
+        # 在消息落库后执行：它直接从消息内容提取实体并建共现边，不依赖 FTS。
+        # consolidation 先于本步执行，已被归档的消息不会进入 kg_edges。
+        if self.flags.get("kg_graph", False):
+            self._build_kg_edges(con, user_id, new_ids, normalized)
+
         return (AddResult(
             request_id=request_id,
             user_id=user_id,
@@ -689,7 +763,193 @@ class RetrieverDB:
             for cid in all_ids:
                 con.execute("UPDATE messages SET consolidated=1 WHERE id=?", (cid,))
                 con.execute("DELETE FROM fts WHERE doc_id=?", (cid,))
+                # 清理已归档消息的实体边图（防止 BFS 穿过失效节点）
+                con.execute("DELETE FROM entity_edges WHERE src_id=? OR dst_id=?", (cid, cid))
+                # 清理已归档消息的知识图谱边（防止桥接穿过失效消息）
+                con.execute("DELETE FROM kg_edges WHERE message_id=?", (cid,))
                 archived_in_batch.add(cid)
+
+    # -------------------------------------------------------- entity graph
+    def _build_entity_edges(self, con, user_id: str, new_ids: list[str], normalized: list[dict]) -> None:
+        """为新消息建立共享实体的邻接边（仅 flags["entity_graph"] 开启时调用）。
+
+        对每条新消息：
+          1. 用 features.extract_entities 提取实体（拉丁专名 + CJK n-gram，零依赖）；
+          2. 通过 FTS 查找含相同实体 token 的已有活跃消息（consolidated=0）；
+          3. 对每对共享实体，在 entity_edges 表插入一条无向边 (src_id, dst_id, shared_entity)。
+        同一批次内的新消息也两两建边。边的 src_id < dst_id（确定性排序），保证幂等。
+        FTS 不可用时静默跳过——与关闭 flag 等价。
+        """
+        max_scan = max(1, int(self.config.max_candidates))
+        # 预提取每条新消息的实体（避免重复计算）
+        new_entities: list[set[str]] = []
+        for item in normalized:
+            ents = {e.lower() for e in features.extract_entities(item["content"])}
+            new_entities.append(ents)
+
+        for offset, mid in enumerate(new_ids):
+            ents = new_entities[offset]
+            if not ents:
+                continue
+            # 用 FTS 查找含任意实体 token 的已有消息
+            expr = self._match_expr(list(ents))
+            if not expr:
+                continue
+            try:
+                fts_rows = con.execute(
+                    "SELECT doc_id FROM fts WHERE fts MATCH ? AND user_id=? "
+                    "AND doc_type='message' LIMIT ?",
+                    (expr, user_id, max_scan),
+                ).fetchall()
+            except sqlite3.OperationalError:
+                fts_rows = []
+            neighbor_ids = [r["doc_id"] for r in fts_rows if r["doc_id"] != mid]
+            if not neighbor_ids:
+                continue
+            # 批量获取已有消息内容，确定共享实体
+            chunk = 400
+            for i in range(0, len(neighbor_ids), chunk):
+                part = neighbor_ids[i : i + chunk]
+                ph = ",".join("?" * len(part))
+                rows = con.execute(
+                    f"SELECT id, content FROM messages "
+                    f"WHERE id IN ({ph}) AND user_id=? AND consolidated=0",
+                    (*part, user_id),
+                ).fetchall()
+                for r in rows:
+                    content_lower = (r["content"] or "").lower()
+                    shared = [e for e in ents if e and e in content_lower]
+                    for entity in shared:
+                        a, b = (mid, r["id"]) if mid <= r["id"] else (r["id"], mid)
+                        con.execute(
+                            "INSERT OR IGNORE INTO entity_edges"
+                            "(src_id, dst_id, shared_entity, weight, user_id) "
+                            "VALUES(?,?,?,?,?)",
+                            (a, b, entity, 1.0, user_id),
+                        )
+
+        # 同一批次内的新消息两两建边
+        for i in range(len(new_ids)):
+            ents_i = new_entities[i]
+            if not ents_i:
+                continue
+            for j in range(i + 1, len(new_ids)):
+                shared = ents_i & new_entities[j]
+                for entity in shared:
+                    a, b = (new_ids[i], new_ids[j]) if new_ids[i] <= new_ids[j] else (new_ids[j], new_ids[i])
+                    con.execute(
+                        "INSERT OR IGNORE INTO entity_edges"
+                        "(src_id, dst_id, shared_entity, weight, user_id) "
+                        "VALUES(?,?,?,?,?)",
+                        (a, b, entity, 1.0, user_id),
+                    )
+
+    # ------------------------------------------------------------- knowledge graph
+    def _build_kg_edges(self, con, user_id: str, new_ids: list[str], normalized: list[dict]) -> None:
+        """为新消息建立实体-实体共现边（仅 flags["kg_graph"] 开启时调用）。
+
+        与 _build_entity_edges（消息-消息邻接）互补但正交：
+          - entity_edges 在 *消息层* 建图：两条消息共享某实体 → 一条边，Search 时 BFS 扩展邻居消息；
+          - kg_edges 在 *实体层* 建图：两个实体在同一消息中共现 → 一条边，Search 时找桥接实体。
+
+        对每条新消息：
+          1. 用 features.extract_entities 提取实体（拉丁专名 + CJK n-gram，零依赖），小写去重；
+          2. 截断到 kg_max_entities_per_message 个（控制全配对边数 O(N^2) 的最坏体积，
+             CJK n-gram 噪声多，截断避免边表爆炸）；
+          3. 对截断后实体集合做全配对，每对插入一条无向共现边 (entity_a, entity_b, message_id)。
+        实体按字典序排列（entity_a <= entity_b）保证主键幂等：同一消息重复 Add 不会产生重复边。
+        只对非空 content 建边；无实体的消息跳过——与关闭 flag 完全等价。
+        """
+        cap = max(1, int(getattr(self.config, "kg_max_entities_per_message", 16)))
+        for offset, mid in enumerate(new_ids):
+            item = normalized[offset]
+            content = item.get("content") or ""
+            # 小写去重并保持确定顺序（extract_entities 已去重，再 lower 一次以防大小写差异）
+            ents: list[str] = []
+            seen: set[str] = set()
+            for e in features.extract_entities(content):
+                low = e.lower()
+                if low and low not in seen:
+                    seen.add(low)
+                    ents.append(low)
+            if len(ents) < 2:
+                continue  # 单实体或无实体无法形成共现边
+            ents = ents[:cap]
+            for i in range(len(ents)):
+                for j in range(i + 1, len(ents)):
+                    a, b = (ents[i], ents[j]) if ents[i] <= ents[j] else (ents[j], ents[i])
+                    con.execute(
+                        "INSERT OR IGNORE INTO kg_edges"
+                        "(entity_a, entity_b, message_id, user_id, weight) "
+                        "VALUES(?,?,?,?,?)",
+                        (a, b, mid, user_id, 1.0),
+                    )
+
+    def _kg_find_bridges(
+        self, con: sqlite3.Connection, user_id: str, query_entities: list[str]
+    ) -> dict[str, int]:
+        """找出连接多个查询实体的「桥接实体」及其关联消息（仅 flags["kg_graph"] 开启时调用）。
+
+        桥接实体（HippoRAG PPR / YourMemory entity graph 的简化版）：一个实体 e3（不在查询
+        实体集合 Q 中）与 ≥2 个不同的查询实体分别在不同消息中共现。它把分散在多条消息里的
+        证据串成推理链——例如查询问 Alice 与 Bob 的关系，而 m1=(Alice, ProjectX)、
+        m2=(ProjectX, Bob)，则 ProjectX 是桥接实体，m1/m2 是桥接消息。
+
+        返回 {message_id: connected_query_entity_count}：
+          - key   = 桥接实体与某查询实体共现的那条消息（构成推理链的节点）；
+          - value = 该消息通过桥接实体连接到的不同查询实体数（越多链越强，提升越大）。
+
+        kg_edges 表为空 / 查询实体 <2 / 无桥接时返回空 dict——与关闭 flag 完全等价。
+        """
+        qset = {e for e in query_entities if e}
+        if len(qset) < 2:
+            return {}
+        # 对每个查询实体，查它参与的所有共现边，收集 (co_occurring_entity -> set(message_id))。
+        # 实体规范化时按字典序存入 entity_a/entity_b，故需双向查询。
+        # co_occur[query_entity] = {other_entity: set(message_ids)}
+        co_occur: dict[str, dict[str, set[str]]] = {}
+        for qe in qset:
+            rows = con.execute(
+                "SELECT entity_b AS other, message_id FROM kg_edges "
+                "WHERE user_id=? AND entity_a=? "
+                "UNION "
+                "SELECT entity_a AS other, message_id FROM kg_edges "
+                "WHERE user_id=? AND entity_b=?",
+                (user_id, qe, user_id, qe),
+            ).fetchall()
+            if not rows:
+                continue
+            m: dict[str, set[str]] = {}
+            for r in rows:
+                other = r["other"]
+                if other in qset:
+                    continue  # 跳过查询实体之间的直连边（单跳答案，FTS 通常已召回）
+                m.setdefault(other, set()).add(r["message_id"])
+            if m:
+                co_occur[qe] = m
+
+        if len(co_occur) < 2:
+            return {}  # 至少两个查询实体在图中有邻居，才可能形成桥接
+
+        # 桥接实体 = 出现在 ≥2 个查询实体邻居集合中的实体。
+        # entity -> {query_entities it connects} 
+        bridge_connections: dict[str, set[str]] = {}
+        for qe, neighbors in co_occur.items():
+            for other in neighbors:
+                bridge_connections.setdefault(other, set()).add(qe)
+
+        # 桥接消息：桥接实体与查询实体共现的那条消息。记录它连接的查询实体数。
+        bridge_msgs: dict[str, int] = {}
+        for other, connected_q in bridge_connections.items():
+            if len(connected_q) < 2:
+                continue  # 只连接 1 个查询实体 → 不是桥接
+            for qe in connected_q:
+                for mid in co_occur[qe][other]:
+                    # 取该消息连接的不同查询实体数（多条边可能汇聚到同一消息）
+                    cur = bridge_msgs.get(mid, 0)
+                    # 用集合避免重复计数：这里简化为取 max(已连接数, 当前桥实体的连接数)
+                    bridge_msgs[mid] = max(cur, len(connected_q))
+        return bridge_msgs
 
     # ------------------------------------------------------------------ views
     def _session_rows(self, con, user_id, session_id, start, end) -> list[dict]:
@@ -877,6 +1137,164 @@ class RetrieverDB:
                 })
         return matches
 
+    def _entity_graph_bfs(
+        self, con: sqlite3.Connection, user_id: str,
+        seed_ids: set[str], existing_ids: set[str],
+    ) -> dict[str, int]:
+        """BFS 遍历 entity_edges 表，发现未召回的图邻居（仅 flags["entity_graph"] 开启时调用）。
+
+        从 seed_ids（已召回的消息候选）出发，沿 entity_edges 无向边做 BFS，
+        收集不在 existing_ids 中的邻居消息 ID。返回 {message_id: depth} 映射，
+        depth 越大表示离种子越远（Search 时提升权重反比于 depth）。
+
+        参数 graph_max_depth 限制 BFS 深度；graph_max_expansion 限制最多补充的候选数。
+        entity_edges 表为空时返回空 dict——与关闭 flag 完全等价。
+        """
+        if not seed_ids:
+            return {}
+        max_depth = max(1, int(getattr(self.config, "graph_max_depth", 2)))
+        max_expansion = max(1, int(getattr(self.config, "graph_max_expansion", 5)))
+
+        visited: set[str] = set(seed_ids) | set(existing_ids)
+        frontier: list[str] = list(seed_ids)
+        neighbors: dict[str, int] = {}
+
+        for depth in range(1, max_depth + 1):
+            if len(neighbors) >= max_expansion or not frontier:
+                break
+            next_frontier: list[str] = []
+            for node in frontier:
+                if len(neighbors) >= max_expansion:
+                    break
+                # 无向边：src_id→dst_id 和 dst_id→src_id 都要查
+                rows = con.execute(
+                    "SELECT dst_id AS mid FROM entity_edges WHERE user_id=? AND src_id=? "
+                    "UNION SELECT src_id AS mid FROM entity_edges WHERE user_id=? AND dst_id=?",
+                    (user_id, node, user_id, node),
+                ).fetchall()
+                for r in rows:
+                    mid = r["mid"]
+                    if mid in visited:
+                        continue
+                    visited.add(mid)
+                    next_frontier.append(mid)
+                    if mid not in existing_ids:
+                        neighbors[mid] = depth
+                        if len(neighbors) >= max_expansion:
+                            break
+            frontier = next_frontier
+        return neighbors
+
+    # ---------------------------------------------------- date-window channel
+    @staticmethod
+    def _parse_date_str(date_str: str) -> float | None:
+        """将 features.extract_dates 返回的日期字符串解析为 UTC 当天零点的 epoch（秒）。
+
+        支持格式：2026-08-14 / 2026/08/14 / 2026.08.14 / 08-14-2026 /
+        2026年8月14日 / 2026年8月。无法解析时返回 None。
+        """
+        import re as _re
+        s = (date_str or "").strip()
+        if not s:
+            return None
+        # YYYY-MM-DD / YYYY/MM/DD / YYYY.MM.DD
+        m = _re.match(r'(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})', s)
+        if m:
+            try:
+                return datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)),
+                                tzinfo=timezone.utc).timestamp()
+            except ValueError:
+                return None
+        # MM-DD-YYYY / DD/MM/YYYY（先按月-日-年解析，失败再尝试日-月-年）
+        m = _re.match(r'(\d{1,2})[-/](\d{1,2})[-/](\d{4})', s)
+        if m:
+            for mo, da in ((int(m.group(1)), int(m.group(2))), (int(m.group(2)), int(m.group(1)))):
+                try:
+                    return datetime(int(m.group(3)), mo, da, tzinfo=timezone.utc).timestamp()
+                except ValueError:
+                    continue
+            return None
+        # YYYY年MM月DD日 / YYYY年MM月
+        m = _re.match(r'(\d{4})\s*年\s*(\d{1,2})\s*月(?:\s*(\d{1,2})\s*日)?', s)
+        if m:
+            try:
+                day = int(m.group(3)) if m.group(3) else 1
+                return datetime(int(m.group(1)), int(m.group(2)), day,
+                                tzinfo=timezone.utc).timestamp()
+            except ValueError:
+                return None
+        return None
+
+    def _extract_query_date_windows(self, query: str) -> list[tuple[float, float]]:
+        """从查询中提取日期窗口 [(start_epoch, end_epoch), ...]（秒，半开区间）。
+
+        合并 features.extract_dates 的数字日期与 parse_absolute_temporal 的英文
+        月份日期。每个日期生成一个 [当天00:00, 次日00:00) 窗口；月/年粒度按保守
+        上限扩展（31/366 天）。可按 date_window_padding_days 向两侧扩展。
+        返回空列表表示查询无可用日期窗口。
+        """
+        padding = max(0, int(getattr(self.config, "date_window_padding_days", 0))) * 86400.0
+        windows: list[tuple[float, float]] = []
+        seen: set[tuple[int, int]] = set()
+        # 数字日期（features.extract_dates 匹配 _DATE_RE）
+        for ds in features.extract_dates(query or ""):
+            epoch = self._parse_date_str(ds)
+            if epoch is None:
+                continue
+            start = epoch - padding
+            end = epoch + 86400.0 + padding
+            key = (int(start), int(end))
+            if key not in seen:
+                seen.add(key)
+                windows.append((start, end))
+        # 英文月份日期（parse_absolute_temporal 覆盖 extract_dates 不匹配的格式）
+        abs_result = parse_absolute_temporal(query or "")
+        if abs_result and abs_result.epoch is not None:
+            gran = abs_result.granularity
+            span = 86400.0
+            if gran == "month":
+                span = 31 * 86400.0
+            elif gran == "year":
+                span = 366 * 86400.0
+            start = abs_result.epoch - padding
+            end = abs_result.epoch + span + padding
+            key = (int(start), int(end))
+            if key not in seen:
+                windows.append((start, end))
+        return windows
+
+    def _date_window_candidates(
+        self, con: sqlite3.Connection, user_id: str, windows: list[tuple[float, float]]
+    ) -> list[tuple[str, str, float]]:
+        """检索 event_time 落在任一日期窗口内的消息，返回 [(doc_id, 'message', 0.0), ...]。
+
+        同时检查 ts_ms（毫秒）与 abs_epoch（秒），覆盖有原始时间戳和仅有正文绝对
+        日期的消息。去重后按窗口出现顺序返回，总量不超过 date_channel_max_candidates。
+        """
+        if not windows:
+            return []
+        max_cand = int(getattr(self.config, "date_channel_max_candidates", 50))
+        candidates: list[tuple[str, str, float]] = []
+        seen: set[str] = set()
+        for start_epoch, end_epoch in windows:
+            start_ms = start_epoch * 1000.0
+            end_ms = end_epoch * 1000.0
+            rows = con.execute(
+                "SELECT id FROM messages "
+                "WHERE user_id=? AND consolidated=0 "
+                "AND ("
+                "  (ts_ms IS NOT NULL AND ts_ms >= ? AND ts_ms < ?) "
+                "  OR (abs_epoch IS NOT NULL AND abs_epoch >= ? AND abs_epoch < ?)"
+                ") "
+                "ORDER BY seq DESC LIMIT ?",
+                (user_id, start_ms, end_ms, start_epoch, end_epoch, max_cand),
+            ).fetchall()
+            for r in rows:
+                if r["id"] not in seen:
+                    seen.add(r["id"])
+                    candidates.append((r["id"], "message", 0.0))
+        return candidates[:max_cand]
+
     def search(
         self,
         *,
@@ -914,6 +1332,18 @@ class RetrieverDB:
                 except Exception:
                     dense_candidates = []  # 稠密失败 → 纯词法路径，不改变语义
 
+            # nomic 稠密通道（ollama nomic-embed-text）：作为第 3 路 RRF 通道。
+            # flag 关闭或后端不可用时 nomic_candidates 为空，零行为变化。
+            nomic_candidates: list[tuple[str, float]] = []
+            nomic = self._nomic_dense_index()
+            if nomic is not None:
+                try:
+                    nomic_candidates = nomic.top_n(
+                        user_id, recall_text, int(self.config.nomic_top_n)
+                    )
+                except Exception:
+                    nomic_candidates = []
+
             # LLM 事实抽取：对 knowledge_update/temporal 查询额外检索事实表。
             # 事实表为空（flag 关闭 / API 不可用 / 无事实）时 fact_matches 为空，
             # 不改变任何检索行为——与纯词法路径完全等价。
@@ -921,7 +1351,17 @@ class RetrieverDB:
             if self.flags.get("fact_extraction", False) and self._has_fact_relevant_intent(query):
                 fact_matches = self._search_facts(con, user_id, tokens)
 
-            if not raw_candidates and not dense_candidates and not fact_matches:
+            # date_channel：日期窗口检索通道。查询含显式日期时，额外检索
+            # event_time 落在日期窗口内的消息（不依赖词法匹配），作为独立 RRF 通道。
+            # flag 关闭或查询无显式日期时 date_order 为空，零行为变化。
+            date_order: list[str] = []
+            if self.flags.get("date_channel", False):
+                windows = self._extract_query_date_windows(query)
+                if windows:
+                    date_candidates = self._date_window_candidates(con, user_id, windows)
+                    date_order = [d[0] for d in date_candidates]
+
+            if not raw_candidates and not dense_candidates and not nomic_candidates and not fact_matches and not date_order:
                 return SearchResult(request_id=request_id, total=0, results=[])
             # 稠密候选与词法候选按 doc_id 合并去重（稠密补充词法漏掉的文档）
             merged: dict[str, tuple[str, str, float]] = {}
@@ -929,6 +1369,8 @@ class RetrieverDB:
                 merged.setdefault(doc_id, (doc_id, doc_type, rank))
             for doc_id, _score in dense_candidates:
                 merged.setdefault(doc_id, (doc_id, "dense", 0.0))
+            for doc_id, _score in nomic_candidates:
+                merged.setdefault(doc_id, (doc_id, "nomic", 0.0))
             raw_candidates = list(merged.values())
             records = self._load_records(con, user_id, raw_candidates)
 
@@ -944,13 +1386,72 @@ class RetrieverDB:
                     records.extend(extra_records)
                     raw_candidates.extend(extra_raw)
 
-        fts_order = [doc_id for doc_id, _t, _r in raw_candidates if _t != "dense"]
+            # 实体边图 BFS 扩展：从已召回的消息种子出发，沿共享实体边发现未召回的图邻居。
+            # graph_neighbors 为空（flag 关闭 / 查询无实体 / 图无边 / 邻居全已召回）时
+            # 零行为变化——与关闭 flag 完全等价。
+            graph_neighbors: dict[str, int] = {}
+            if self.flags.get("entity_graph", False):
+                query_entities = [e.lower() for e in features.extract_entities(query)][:32]
+                if query_entities:
+                    seed_ids = {r["id"] for r in records if r["view"] == "message"}
+                    existing_ids = {r["id"] for r in records}
+                    graph_neighbors = self._entity_graph_bfs(con, user_id, seed_ids, existing_ids)
+                    if graph_neighbors:
+                        extra_raw = [(mid, "message", 0.0) for mid in graph_neighbors]
+                        extra_records = self._load_records(con, user_id, extra_raw)
+                        records.extend(extra_records)
+                        raw_candidates.extend(extra_raw)
+                        # 只保留实际加载成功的邻居（consolidated=0 过滤后）
+                        loaded_ids = {r["id"] for r in extra_records}
+                        graph_neighbors = {k: v for k, v in graph_neighbors.items() if k in loaded_ids}
+
+            # 知识图谱多跳桥接：若查询含 ≥2 个实体，找出桥接实体连接的消息，
+            # 作为额外候选召回（FTS 漏召回的多跳证据）并传给 _score 做提升。
+            # kg_bridges 为空（flag 关闭 / 查询实体 <2 / 无桥接）时零行为变化。
+            kg_bridges: dict[str, int] = {}
+            if self.flags.get("kg_graph", False):
+                qe_list = [e.lower() for e in features.extract_entities(query)][:32]
+                if len({e for e in qe_list if e}) >= 2:
+                    kg_bridges = self._kg_find_bridges(con, user_id, qe_list)
+                    if kg_bridges:
+                        existing_ids = {r["id"] for r in records}
+                        bridge_limit = int(getattr(self.config, "kg_max_bridge_messages", 10))
+                        extra_ids = [mid for mid in kg_bridges if mid not in existing_ids][:bridge_limit]
+                        if extra_ids:
+                            extra_raw = [(mid, "message", 0.0) for mid in extra_ids]
+                            extra_records = self._load_records(con, user_id, extra_raw)
+                            records.extend(extra_records)
+                            raw_candidates.extend(extra_raw)
+                        # 只保留实际存在于记录中的桥接消息（含已召回 + 新加载）
+                        all_ids = {r["id"] for r in records}
+                        kg_bridges = {k: v for k, v in kg_bridges.items() if k in all_ids}
+
+            # date_channel 补充候选：词法召回遗漏但日期窗口命中的消息。
+            if date_order:
+                existing_ids = {r["id"] for r in records}
+                date_extra_limit = int(self.config.date_channel_max_candidates)
+                extra_ids = [mid for mid in date_order if mid not in existing_ids][:date_extra_limit]
+                if extra_ids:
+                    extra_raw = [(mid, "message", 0.0) for mid in extra_ids]
+                    extra_records = self._load_records(con, user_id, extra_raw)
+                    records.extend(extra_records)
+                    raw_candidates.extend(extra_raw)
+
+        fts_order = [doc_id for doc_id, _t, _r in raw_candidates if _t not in ("dense", "nomic")]
         dense_order = [doc_id for doc_id, _score in dense_candidates]
+        nomic_order = [doc_id for doc_id, _score in nomic_candidates]
         rank_map = {doc_id: rank for doc_id, _t, rank in raw_candidates}
         if not records:
             return SearchResult(request_id=request_id, total=0, results=[])
 
-        scored = self._score(records, query, tokens, rank_map, fact_matches=fact_matches)
+        scored = self._score(records, query, tokens, rank_map, fact_matches=fact_matches, graph_neighbors=graph_neighbors, kg_bridges=kg_bridges)
+
+        # date_channel 证据标记：标记来自日期窗口通道的候选，便于审计/消融。
+        if date_order:
+            date_set = set(date_order)
+            for rec in scored:
+                if rec["id"] in date_set and "date_channel" not in rec["flags"]:
+                    rec["flags"].append("date_channel")
 
         # vNext：实体消歧后的软重排必须发生在 RRF 融合前，
         # 这样 feature 路的排序会反映其增益；它从不删除任何候选。
@@ -963,9 +1464,25 @@ class RetrieverDB:
                 config=self.config,
             )
 
-        ordered = self._fuse_and_order(scored, fts_order, dense_order=dense_order)
+        ordered = self._fuse_and_order(scored, fts_order, dense_order=dense_order, nomic_order=nomic_order, date_order=date_order)
         if self.flags.get("dedup", True):
             ordered = self._dedup(ordered)
+        # recency_sort：对 current-value / temporal 查询，按 event_time DESC 硬排序。
+        # 当前状态问题的答案是最新的陈述，硬排序比软权重更直接地保证最新证据排前。
+        if self.flags.get("recency_sort", False) and (
+            features.has_current_value_intent(query) or features.has_temporal_intent(query)
+        ):
+            ordered = self._apply_recency_sort(ordered)
+        # entity_contradiction_filter：对 current-value 查询，从结果中硬过滤被
+        # 标记为 entity_contradiction_superseded 的记录（较早的极性矛盾消息）。
+        # 过滤发生在 slot_guarantee 之前，使空出的槽位由剩余候选按排序补入，
+        # 保证 top_k 不因过滤而变少。非 current-value 查询不过滤（仅靠 winner
+        # 分数提升影响排序）。flag 关闭或无矛盾标记时零行为变化。
+        if self.flags.get("entity_contradiction_filter", False) and features.has_current_value_intent(query):
+            ordered = [
+                r for r in ordered
+                if "entity_contradiction_superseded" not in r.get("flags", [])
+            ]
         final = self._apply_slot_guarantee(ordered, limit)
         # 塑形在槽位保证之后：它只重排/加前缀，不改变"哪些记录入选"
         final = self._apply_ordering_shaping(final, query)
@@ -1034,6 +1551,26 @@ class RetrieverDB:
                 rec["content"] = f"[事件{idx}] {content}"
         return messages + others
 
+    def _apply_recency_sort(self, ordered: list[dict]) -> list[dict]:
+        """recency_sort：按 event_time DESC 硬排序（稳定）。
+
+        仅在 flags["recency_sort"] 开启、且查询为 has_current_value_intent 或
+        has_temporal_intent 时由 search() 调用。有事件时间的候选按时间降序排列
+        （最新在前），无时间信息的候选保持原相对顺序排在尾部。不删除任何候选，
+        只改变顺序——slot_guarantee 之后的 top_k 截断因此优先保留最新证据。
+        """
+        indexed = list(enumerate(ordered))
+
+        def _key(pair):
+            idx, rec = pair
+            epoch = self._epoch_of(rec)
+            if epoch is not None:
+                return (0, -epoch, idx)
+            return (1, 0.0, idx)
+
+        indexed.sort(key=_key)
+        return [rec for _, rec in indexed]
+
     def _content_for_response(self, rec: dict, query: str = "") -> str:
         """内容塑造：按配置给返回内容附加事件时间元数据（不改原文，不改排序）。
 
@@ -1076,9 +1613,9 @@ class RetrieverDB:
 
     def _load_records(self, con, user_id, raw_candidates) -> list[dict]:
         msg_ids = [d for d, t, _ in raw_candidates if t == "message"]
-        view_ids = [d for d, t, _ in raw_candidates if t not in ("message", "dense")]
-        # 稠密通道的候选 doc_id 类型未知：先尝试按消息加载，剩余的按视图加载
-        unknown_ids = [d for d, t, _ in raw_candidates if t == "dense"]
+        view_ids = [d for d, t, _ in raw_candidates if t not in ("message", "dense", "nomic")]
+        # 稠密/nomic 通道的候选 doc_id 类型未知：先尝试按消息加载，剩余的按视图加载
+        unknown_ids = [d for d, t, _ in raw_candidates if t in ("dense", "nomic")]
         if unknown_ids:
             found_msg: set[str] = set()
             chunk_u = 400
@@ -1124,7 +1661,7 @@ class RetrieverDB:
                 out.append(rec)
         return out
 
-    def _score(self, records, query, tokens, rank_map, fact_matches=None) -> list[dict]:
+    def _score(self, records, query, tokens, rank_map, fact_matches=None, graph_neighbors=None, kg_bridges=None) -> list[dict]:
         q_lower = (query or "").lower()
         numbers = features.extract_numbers(query)
         dates = features.extract_dates(query)
@@ -1289,6 +1826,34 @@ class RetrieverDB:
                     if "fact_match" not in rec["flags"]:
                         rec["flags"].append("fact_match")
 
+        # 实体边图 BFS 扩展候选的分数提升（在 RRF 融合前生效，使 feature 路排序
+        # 反映图扩展增益）。graph_neighbors 为空（flag 关闭 / 查询无实体 / 无图边 /
+        # 邻居全已召回）时零行为变化——与关闭 flag 完全等价。
+        # boost = graph_boost_weight / depth：直接邻居（depth=1）获全额提升，
+        # 两跳邻居（depth=2）获半额，深度越深增益越小。
+        if graph_neighbors:
+            weight = float(getattr(self.config, "graph_boost_weight", 15.0))
+            for rec in records:
+                depth = graph_neighbors.get(rec["id"])
+                if depth is not None:
+                    rec["score"] += weight / float(depth)
+                    if "entity_graph" not in rec["flags"]:
+                        rec["flags"].append("entity_graph")
+
+        # 知识图谱多跳桥接消息的分数提升（在 RRF 融合前生效，使 feature 路排序
+        # 反映桥接增益）。kg_bridges 为空（flag 关闭 / 查询实体 <2 / 无桥接）时
+        # 零行为变化——与关闭 flag 完全等价。
+        # boost = kg_bridge_boost_weight × min(connected_query_entities, 3) / 3：
+        # 连接的查询实体越多，推理链越强，提升越大（封顶 3 个查询实体）。
+        if kg_bridges:
+            base = float(getattr(self.config, "kg_bridge_boost_weight", 15.0))
+            for rec in records:
+                connected = kg_bridges.get(rec["id"])
+                if connected is not None and connected > 0:
+                    rec["score"] += base * min(connected, 3) / 3.0
+                    if "kg_bridge" not in rec["flags"]:
+                        rec["flags"].append("kg_bridge")
+
         if (
             self.flags.get("preference_role_boost", False)
             and features.has_preference_intent(query)
@@ -1318,6 +1883,11 @@ class RetrieverDB:
                 query=query,
                 require_update_cue=self.flags.get("supersession_update_guard", False),
             )
+        if self.flags.get("entity_contradiction_filter", False):
+            # entity_contradiction_filter：实体级极性矛盾检测。
+            # 标记较早的矛盾消息为 superseded；search() 对 current-value 查询
+            # 硬过滤 superseded 记录。flag 关闭时零行为变化。
+            self._mark_entity_contradictions(records)
         return records
 
     def _annotate_temporal(self, records: list[dict], rank_map: dict[str, float] | None = None, query: str = "") -> None:
@@ -1531,6 +2101,102 @@ class RetrieverDB:
                 if "polarity_conflict_pair" not in rec["flags"]:
                     rec["flags"].append("polarity_conflict_pair")
 
+    def _predicate_signature(self, text: str) -> frozenset:
+        """谓词签名：排除实体与值（数字/日期）token 后的话题指纹。
+
+        用于 entity_contradiction_filter 判断两条同实体消息是否在谈论同一谓词
+        /属性。与 _supersession_signature 的区别：后者保留全部 token（含实体名
+        与数值），而本方法移除实体式 token（extract_entities）与值 token
+        （extract_numbers / extract_dates），使残留 token 更接近"谓词"语义。
+        """
+        ents = {e.lower() for e in features.extract_entities(text or "")}
+        nums = set(features.extract_numbers(text or ""))
+        dates = set(features.extract_dates(text or ""))
+        return frozenset(
+            t for t in features.tokenize(text or "")
+            if len(t) >= 2 and t not in ents and t not in nums and t not in dates
+        )
+
+    def _mark_entity_contradictions(self, records) -> None:
+        """entity_contradiction_filter：实体级极性矛盾检测。
+
+        按主实体（extract_entities 首个 token）分组候选消息，在同实体组内检测
+        「谓词签名高度重合 + 极性相反（一肯定一否定 via has_negation）」的消息对，
+        标记较早的消息为 superseded、较晚的消息为 winner。
+
+        - winner：score += entity_contradiction_weight，标记
+          ``entity_contradiction_winner``（使非 current-value 查询中最新值排前）。
+        - superseded：标记 ``entity_contradiction_superseded``。对 current-value
+          查询（has_current_value_intent），search() 会从结果中硬过滤这些记录。
+
+        同时被判为 winner 和 superseded 的记录处于更新链中间，不加不减
+        （与 _mark_supersession 同策略，避免链式更新时中间态被误抬/误降）。
+
+        纯结构性判定（实体分组 + 谓词 containment + 否定极性），不依赖评测集
+        硬编码。只对 message 视图操作；聚合视图天然与成员高度重合，会产生
+        虚假矛盾对。
+        """
+        pool = [r for r in records if r["view"] == "message"]
+        if len(pool) < 2:
+            return
+        # 按主实体分组（首个 extract_entities token，小写）
+        buckets: dict[str, list[dict]] = {}
+        for rec in pool:
+            ents = features.extract_entities(rec["content"] or "")[:1]
+            if ents:
+                buckets.setdefault(ents[0].lower(), []).append(rec)
+
+        min_overlap = float(getattr(self.config, "entity_contradiction_min_overlap", 0.4))
+        weight = float(getattr(self.config, "entity_contradiction_weight", 4.0))
+        superseded: set[str] = set()
+        winners: set[str] = set()
+
+        for group in buckets.values():
+            if len(group) < 2:
+                continue
+            # 按事件时间升序排序，保证 older/newer 判定确定性
+            group.sort(key=lambda r: (self._epoch_of(r) if self._epoch_of(r) is not None else 0.0, r["id"]))
+            sigs = {r["id"]: self._predicate_signature(r["content"]) for r in group}
+            negs = {r["id"]: features.has_negation(r["content"]) for r in group}
+            epochs = {r["id"]: self._epoch_of(r) for r in group}
+
+            for i in range(len(group)):
+                a = group[i]
+                sig_a = sigs[a["id"]]
+                if not sig_a:
+                    continue
+                for j in range(i + 1, len(group)):
+                    b = group[j]
+                    sig_b = sigs[b["id"]]
+                    if not sig_b:
+                        continue
+                    inter = len(sig_a & sig_b)
+                    if not inter:
+                        continue
+                    # containment（交集 / 较短一方），与 _mark_supersession 一致
+                    if inter / float(min(len(sig_a), len(sig_b))) < min_overlap:
+                        continue
+                    # 同谓词；检查极性是否相反
+                    if negs[a["id"]] == negs[b["id"]]:
+                        continue  # 同极性，非矛盾
+                    ea, eb = epochs[a["id"]], epochs[b["id"]]
+                    if ea is None or eb is None or ea == eb:
+                        continue
+                    older, newer = (a, b) if ea < eb else (b, a)
+                    superseded.add(older["id"])
+                    winners.add(newer["id"])
+
+        for rec in records:
+            rid = rec["id"]
+            is_new, is_old = rid in winners, rid in superseded
+            if is_new and not is_old:
+                rec["score"] += weight
+                if "entity_contradiction_winner" not in rec["flags"]:
+                    rec["flags"].append("entity_contradiction_winner")
+            elif is_old and not is_new:
+                if "entity_contradiction_superseded" not in rec["flags"]:
+                    rec["flags"].append("entity_contradiction_superseded")
+
     def _supersession_signature(self, text: str) -> frozenset:
         """消息的「话题指纹」：长度≥2 的 n-gram 集合。
 
@@ -1665,13 +2331,14 @@ class RetrieverDB:
                 if "superseded" not in rec["flags"]:
                     rec["flags"].append("superseded")
 
-    def _fuse_and_order(self, records, fts_order, dense_order=None) -> list[dict]:
+    def _fuse_and_order(self, records, fts_order, dense_order=None, nomic_order=None, date_order=None) -> list[dict]:
         feat_order = [
             r["id"]
             for r in sorted(records, key=lambda x: (-x["score"], len(x["content"] or ""), x["id"]))
         ]
         if self.flags.get("rrf", True):
-            # 加权 RRF：特征路与词法路权重可配（稠密通道开启时加入第三路）。
+            # 加权 RRF：特征路与词法路权重可配（稠密通道开启时加入第三路，
+            # date_channel 开启时加入日期窗口通道）。
             # 实测（docs/EVAL.md 附录 A，合成集 medium）：提高词法权重会**持续抬高 MRR**
             # 同时**持续压低 Recall@20**（Recall@100 恒为 1.0，说明 gold 没丢、只是被挤出前 20）。
             # 默认 w_lex=0.1 是扫描点中唯一 Pareto 安全的取值：三种难度 MRR 均正增益且
@@ -1686,6 +2353,14 @@ class RetrieverDB:
                 w_dense = float(getattr(self.config, "dense_rrf_weight", 0.5))
                 if w_dense != 0.0:
                     channels.append((dense_order, w_dense))
+            if nomic_order:
+                w_nomic = float(getattr(self.config, "nomic_rrf_weight", 0.5))
+                if w_nomic != 0.0:
+                    channels.append((nomic_order, w_nomic))
+            if date_order:
+                w_date = float(getattr(self.config, "date_channel_rrf_weight", 0.5))
+                if w_date != 0.0:
+                    channels.append((date_order, w_date))
             for order, weight in channels:
                 if weight == 0.0:
                     continue
@@ -1757,8 +2432,13 @@ class RetrieverDB:
             con.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
             con.execute("DELETE FROM fts_facts WHERE user_id=?", (user_id,))
             con.execute("DELETE FROM facts WHERE user_id=?", (user_id,))
+            con.execute("DELETE FROM kg_edges WHERE user_id=?", (user_id,))
             try:  # dense_vectors 表惰性创建；未启用稠密通道时可能不存在
                 con.execute("DELETE FROM dense_vectors WHERE user_id=?", (user_id,))
+            except sqlite3.OperationalError:
+                pass
+            try:  # nomic_vectors 表惰性创建；未启用 nomic 通道时可能不存在
+                con.execute("DELETE FROM nomic_vectors WHERE user_id=?", (user_id,))
             except sqlite3.OperationalError:
                 pass
             return {"user_id": user_id, "deleted_messages": n_msg, "deleted_views": n_view}
@@ -1767,22 +2447,28 @@ class RetrieverDB:
         if self._dense is not None:
             with self._dense._lock:
                 self._dense._cache.pop(user_id, None)
+        if self._nomic_dense is not None:
+            with self._nomic_dense._lock:
+                self._nomic_dense._cache.pop(user_id, None)
         return result
 
     def purge_all(self) -> dict:
         def _do(con):
             n = con.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
-            try:  # dense_vectors 表惰性创建；未启用稠密通道时可能不存在
+            try:  # dense_vectors/nomic_vectors 表惰性创建；未启用稠密通道时可能不存在
                 con.executescript(
                     "DELETE FROM fts; DELETE FROM messages; DELETE FROM views; "
                     "DELETE FROM requests; DELETE FROM sessions; DELETE FROM dense_vectors; "
-                    "DELETE FROM fts_facts; DELETE FROM facts;"
+                    "DELETE FROM nomic_vectors; "
+                    "DELETE FROM fts_facts; DELETE FROM facts; "
+                    "DELETE FROM entity_edges; DELETE FROM kg_edges;"
                 )
             except sqlite3.OperationalError:
                 con.executescript(
                     "DELETE FROM fts; DELETE FROM messages; DELETE FROM views; "
                     "DELETE FROM requests; DELETE FROM sessions; "
-                    "DELETE FROM fts_facts; DELETE FROM facts;"
+                    "DELETE FROM fts_facts; DELETE FROM facts; "
+                    "DELETE FROM entity_edges; DELETE FROM kg_edges;"
                 )
             return {"deleted_messages": n}
 
@@ -1790,6 +2476,9 @@ class RetrieverDB:
         if self._dense is not None:
             with self._dense._lock:
                 self._dense._cache.clear()
+        if self._nomic_dense is not None:
+            with self._nomic_dense._lock:
+                self._nomic_dense._cache.clear()
         return result
 
     # --------------------------------------------------------------- 只读辅助
