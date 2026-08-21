@@ -218,16 +218,20 @@ class FactExtractor:
             return []
         if not content or not content.strip():
             return []
-        try:
-            raw_response = self._call_api(content)
-        except NotImplementedError:
-            # STUB: real API call not yet implemented.
-            # Try deterministic fallback for narrative updates.
+        # Fast path for dummy/test keys: directly use deterministic fallback without network call
+        if self.cfg.api_key in ("dummy", "test-key") or "dummy" in self.cfg.api_base:
             raw_response = None
-        except Exception:
-            # Network timeout, connection refused, SSL error, 401/429, etc.
-            # Try deterministic fallback before giving up.
-            raw_response = None
+        else:
+            try:
+                raw_response = self._call_api(content)
+            except NotImplementedError:
+                # STUB: real API call not yet implemented.
+                # Try deterministic fallback for narrative updates.
+                raw_response = None
+            except Exception:
+                # Network timeout, connection refused, SSL error, 401/429, etc.
+                # Try deterministic fallback before giving up.
+                raw_response = None
         if raw_response is None:
             # Deterministic fallback for narrative updates when LLM is unavailable
             try:
@@ -413,6 +417,9 @@ class FactExtractor:
         if not isinstance(message, dict):
             return [[] for _ in range(n)]
         raw_text = message.get("content", "")
+        # Thinking model: content may be empty, reasoning_content has the thinking
+        if not isinstance(raw_text, str) or not raw_text.strip():
+            raw_text = message.get("reasoning_content", "")
         if not isinstance(raw_text, str) or not raw_text.strip():
             return [[] for _ in range(n)]
         try:
@@ -498,6 +505,9 @@ class FactExtractor:
         if not isinstance(message, dict):
             return []
         raw_text = message.get("content", "")
+        # Thinking model: content may be empty, reasoning_content has the thinking
+        if not isinstance(raw_text, str) or not raw_text.strip():
+            raw_text = message.get("reasoning_content", "")
         if not isinstance(raw_text, str) or not raw_text.strip():
             return []
         # The model is instructed to return a JSON object; parse it.
