@@ -1,5 +1,7 @@
 # just-agent
 
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Deterministic, evidence-first memory retrieval for the
 [Agent Memory Leaderboard](https://agentmemories.ai/leaderboard/).
 
