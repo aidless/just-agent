@@ -27,6 +27,7 @@ jobs:
         # suite on this tree: 253 passed / 71 passed respectively.
         run: |
           python -m pip install --upgrade pip
+          pip install pytest
           python -c "import pytest; print('pytest', pytest.__version__)"
       - name: Run the test suite
         run: python -m pytest -q
