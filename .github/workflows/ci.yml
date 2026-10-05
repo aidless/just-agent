@@ -33,3 +33,49 @@ jobs:
           python -c "import pytest; print('pytest', pytest.__version__)"
       - name: Run the test suite
         run: python -m pytest -q
+
+  mutation-control:
+    name: The test suite gate can fail
+    runs-on: ubuntu-latest
+    # No `needs`: the reverse control has to run whether or not the suite is green,
+    # or it only demonstrates something on the runs where nothing is broken.
+    if: always()
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+      - name: Corrupt a collected test file and require a non-zero exit
+        run: |
+          set -uo pipefail
+          # A file pytest actually collects. tests/test_*.py is what the suite runs;
+          # corrupting a module it never imports would prove nothing.
+          target=$(git ls-files 'tests/test_*.py' | head -1)
+          if [ -z "$target" ]; then
+            target=$(git ls-files '*test*.py' | head -1)
+          fi
+          if [ -z "$target" ]; then
+            echo "FAIL: no test file is tracked, so the suite has nothing to collect"
+            exit 1
+          fi
+          echo "--- baseline ---"
+          # The suite must be green first; otherwise a failure after corrupting a file
+          # would be indistinguishable from a suite that was already broken.
+          if ! python -m pytest -q --collect-only > /dev/null 2>&1; then
+            echo "FAIL: pytest cannot even collect the unmodified suite"
+            exit 1
+          fi
+          echo "collection passed"
+          echo "--- corrupting $target ---"
+          cp "$target" /tmp/test.bak
+          printf '\n\ndef __mutation_control__(:\n' >> "$target"
+          if python -m pytest -q; then
+            echo "FAIL: the suite accepted a test file with a syntax error"
+            exit 1
+          fi
+          cp /tmp/test.bak "$target"
+          echo "OK: the suite rejected the corrupted test file"
