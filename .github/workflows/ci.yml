@@ -79,3 +79,20 @@ jobs:
           fi
           cp /tmp/test.bak "$target"
           echo "OK: the suite rejected the corrupted test file"
+
+  secret-scan:
+    # .gitleaks.toml and .pre-commit-config.yaml are present, but a pre-commit
+    # hook is opt-in, missing from a fresh clone (.git/hooks holds only *.sample),
+    # bypassable with `git commit --no-verify`, and only ever inspects staged
+    # content -- never history. Nothing in CI looked at secrets, so a committed
+    # key would have left every other check green.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Full history: a key leaked in an old commit is still a live key.
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+          GITLEAKS_NOTIFY_USER_LIST: ""
