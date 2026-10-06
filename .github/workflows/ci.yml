@@ -86,6 +86,13 @@ jobs:
     # bypassable with `git commit --no-verify`, and only ever inspects staged
     # content -- never history. Nothing in CI looked at secrets, so a committed
     # key would have left every other check green.
+    permissions:
+      contents: read
+      # gitleaks-action v2 reads pull-request metadata, and Dependabot
+      # opens PRs against these repositories. Without this the action aborts
+      # with "GITHUB_TOKEN is now required to scan pull requests" -- a
+      # failure that has nothing to do with the repository contents.
+      pull-requests: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
